@@ -10,6 +10,8 @@ import os
 import shutil
 import tarfile
 import tempfile
+from typing import BinaryIO, Iterable
+
 
 from .error import SigMFFileError
 
@@ -21,7 +23,7 @@ SIGMF_COLLECTION_EXT = ".sigmf-collection"
 
 
 class SigMFArchive():
-    """Archive a SigMFFile.
+    """Archive one or more `SigMFFile`s.
 
     A `.sigmf` file must include both valid metadata and data.
     If `self.data_file` is not set or the requested output file
@@ -29,52 +31,41 @@ class SigMFArchive():
 
     Parameters:
 
-      sigmffile -- A SigMFFile object with valid metadata and data_file
+      sigmffile -- An iterable of SigMFFile objects with valid metadata and data_files
 
       name      -- path to archive file to create. If file exists, overwrite.
-                   If `name` doesn't end in .sigmf, it will be appended.
-                   For example: if `name` == "/tmp/archive1", then the
-                   following archive will be created:
-                       /tmp/archive1.sigmf
-                       - archive1/
-                         - archive1.sigmf-meta
-                         - archive1.sigmf-data
+                    If `name` doesn't end in .sigmf, it will be appended. The
+                    `self.path` instance variable will be updated upon
+                    successful writing of the archive to point to the final
+                    archive path.
+
 
       fileobj   -- If `fileobj` is specified, it is used as an alternative to
-                   a file object opened in binary mode for `name`. It is
-                   supposed to be at position 0. `name` is not required, but
-                   if specified will be used to determine the directory and
-                   file names within the archive. `fileobj` won't be closed.
-                   For example: if `name` == "archive1" and fileobj is given,
-                   a tar archive will be written to fileobj with the
-                   following structure:
-                       - archive1/
-                         - archive1.sigmf-meta
-                         - archive1.sigmf-data
+                    a file object opened in binary mode for `name`. If
+                    `fileobj` is an open tarfile, it will be appended to. It is
+                    supposed to be at position 0. `fileobj` won't be closed. If
+                    `fileobj` is given, `name` has no effect.
     """
-    def __init__(self, sigmffile, name=None, fileobj=None):
-        self.sigmffile = sigmffile
+    def __init__(self, sigmffiles : Iterable["SigMFFile"], name : str = None, fileobj : BinaryIO =None):
+        self.sigmffiles = sigmffiles
+            
         self.name = name
         self.fileobj = fileobj
 
         self._check_input()
 
-        archive_name = self._get_archive_name()
+        mode = "a" if fileobj is not None else "w"
         sigmf_fileobj = self._get_output_fileobj()
-        sigmf_archive = tarfile.TarFile(mode="w",
-                                        fileobj=sigmf_fileobj,
-                                        format=tarfile.PAX_FORMAT)
-        tmpdir = tempfile.mkdtemp()
-        sigmf_md_filename = archive_name + SIGMF_METADATA_EXT
-        sigmf_md_path = os.path.join(tmpdir, sigmf_md_filename)
-        sigmf_data_filename = archive_name + SIGMF_DATASET_EXT
-        sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
-
-        with open(sigmf_md_path, "w") as mdfile:
-            self.sigmffile.dump(mdfile, pretty=True)
-
-        shutil.copy(self.sigmffile.data_file, sigmf_data_path)
-
+        try:
+            sigmf_archive = tarfile.TarFile(mode=mode,
+                                            fileobj=sigmf_fileobj,
+                                            format=tarfile.PAX_FORMAT)
+        except tarfile.ReadError:
+             # fileobj doesn't contain any archives yet, so reopen in 'w' mode
+            sigmf_archive = tarfile.TarFile(mode='w',
+                                            fileobj=sigmf_fileobj,
+                                            format=tarfile.PAX_FORMAT)
+            
         def chmod(tarinfo):
             if tarinfo.isdir():
                 tarinfo.mode = 0o755  # dwrxw-rw-r
@@ -82,19 +73,33 @@ class SigMFArchive():
                 tarinfo.mode = 0o644  # -wr-r--r--
             return tarinfo
 
-        sigmf_archive.add(tmpdir, arcname=archive_name, filter=chmod)
+        for sigmffile in self.sigmffiles:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sigmf_md_filename = sigmffile.name + SIGMF_METADATA_EXT
+                sigmf_md_path = os.path.join(tmpdir, sigmf_md_filename)
+                sigmf_data_filename = sigmffile.name + SIGMF_DATASET_EXT
+                sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
+
+                with open(sigmf_md_path, "w") as mdfile:
+                    sigmffile.dump(mdfile, pretty=True)
+
+                shutil.copy(sigmffile.data_file, sigmf_data_path)
+                sigmf_archive.add(tmpdir, arcname=sigmffile.name, filter=chmod)
+
         sigmf_archive.close()
         if not fileobj:
             sigmf_fileobj.close()
-
-        shutil.rmtree(tmpdir)
+        else:
+            sigmf_fileobj.seek(0)  # ensure next open can read this as a tar
 
         self.path = sigmf_archive.name
 
     def _check_input(self):
         self._ensure_name_has_correct_extension()
-        self._ensure_data_file_set()
-        self._validate_sigmffile_metadata()
+        for sigmffile in self.sigmffiles:
+            self._ensure_sigmffile_name_set(sigmffile)
+            self._ensure_data_file_set(sigmffile)
+            self._validate_sigmffile_metadata(sigmffile)
 
     def _ensure_name_has_correct_extension(self):
         name = self.name
@@ -110,13 +115,21 @@ class SigMFArchive():
 
         self.name = name if has_correct_extension else name + SIGMF_ARCHIVE_EXT
 
-    def _ensure_data_file_set(self):
-        if not self.sigmffile.data_file:
+    @staticmethod
+    def _ensure_sigmffile_name_set(sigmffile):
+        if not sigmffile.name:
+            err = "the `name` attribute must be set to pass to `SigMFArchive`"
+            raise SigMFFileError(err)
+    
+    @staticmethod
+    def _ensure_data_file_set(sigmffile):
+        if not sigmffile.data_file:
             err = "no data file - use `set_data_file`"
             raise SigMFFileError(err)
 
-    def _validate_sigmffile_metadata(self):
-        self.sigmffile.validate()
+    @staticmethod
+    def _validate_sigmffile_metadata(sigmffile):
+        sigmffile.validate()
 
     def _get_archive_name(self):
         if self.fileobj and not self.name:

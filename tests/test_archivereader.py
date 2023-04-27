@@ -9,7 +9,7 @@ import pytest
 
 from sigmf import error
 from sigmf import SigMFFile, SigMFArchiveReader
-from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT
+from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
 
 def test_access_data_without_untar(test_sigmffile):
     global_info = {
@@ -52,3 +52,23 @@ def test_access_data_without_untar(test_sigmffile):
                 meta.tofile(archive_filename, toarchive=True)
 
                 archi = SigMFArchiveReader(archive_filename, skip_checksum=True)
+
+def test_extract_single_recording(test_sigmffile):
+    with tempfile.NamedTemporaryFile() as tf:
+        expected_sigmffile = test_sigmffile
+        arch = SigMFArchive([expected_sigmffile], name=tf.name)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 1
+        actual_sigmffile = reader[0]
+        assert expected_sigmffile == actual_sigmffile
+
+
+def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
+    with tempfile.NamedTemporaryFile() as tf:
+        # Create a multi-recording archive
+        expected_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        arch = SigMFArchive(expected_sigmffiles, name=tf.name)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 2
+        for expected in expected_sigmffiles:
+            assert expected in reader.sigmffiles

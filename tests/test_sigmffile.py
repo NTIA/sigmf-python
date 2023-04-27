@@ -35,8 +35,8 @@ class TestClassMethods(unittest.TestCase):
     def setUp(self):
         '''assure tests have a valid SigMF object to work with'''
         _, temp_path = tempfile.mkstemp()
-        TEST_FLOAT32_DATA.tofile(temp_path)
-        self.sigmf_object = SigMFFile(TEST_METADATA, data_file=temp_path)
+        TEST_FLOAT32_DATA_1.tofile(temp_path)
+        self.sigmf_object = SigMFFile(TEST_METADATA_1, data_file=temp_path)
 
     def test_iterator_basic(self):
         '''make sure default batch_size works'''
@@ -84,13 +84,25 @@ def test_add_annotation():
     sigf.add_annotation(start_index=0, length=128, metadata=meta)
 
 
+def test_add_annotation_with_duplicate_key():
+    f = SigMFFile()
+    f.add_capture(start_index=0)
+    m1 = {"latitude": 40.0, "longitude": -105.0}
+    f.add_annotation(start_index=0, length=128, metadata=m1)
+    m2 = {"latitude": 50.0, "longitude": -115.0}
+    f.add_annotation(start_index=0, length=128, metadata=m2)
+    assert len(f.get_annotations(64)) == 2
+
+
 def test_fromarchive(test_sigmffile):
     print("test_sigmffile is:\n", test_sigmffile)
     tf = tempfile.mkstemp()[1]
     td = tempfile.mkdtemp()
-    archive_path = test_sigmffile.archive(name=tf)
+    archive_path = test_sigmffile.archive(archive_name=tf)
     result = sigmffile.fromarchive(archive_path=archive_path, dir=td)
-    assert result._metadata == test_sigmffile._metadata == TEST_METADATA
+    assert len(result) == 1
+    result = result[0]
+    assert result._metadata == test_sigmffile._metadata == TEST_METADATA_1
     os.remove(tf)
     shutil.rmtree(td)
 
@@ -163,7 +175,7 @@ def test_multichannel_seek():
 
 def test_key_validity():
     '''assure the keys in test metadata are valid'''
-    for top_key, top_val in TEST_METADATA.items():
+    for top_key, top_val in TEST_METADATA_1.items():
         if type(top_val) is dict:
             for core_key in top_val.keys():
                 assert core_key in vars(SigMFFile)[f'VALID_{top_key.upper()}_KEYS']

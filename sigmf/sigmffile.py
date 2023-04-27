@@ -148,7 +148,7 @@ class SigMFFile(SigMFMetafile):
     ]
     VALID_KEYS = {GLOBAL_KEY: VALID_GLOBAL_KEYS, CAPTURE_KEY: VALID_CAPTURE_KEYS, ANNOTATION_KEY: VALID_ANNOTATION_KEYS}
 
-    def __init__(self, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True):
+    def __init__(self, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True, name=None):
         '''
         API for SigMF I/O
 
@@ -164,6 +164,13 @@ class SigMFFile(SigMFMetafile):
             When True will skip calculating hash on data_file (if present) to check against metadata.
         map_readonly: bool, default True
             Indicates whether assignments on the numpy.memmap are allowed.
+        name: Name used for directory and filenames if archived.
+                     For example, given `name=archive1`, then passing this
+                     sigmffile to SigMFArchive will add the following files
+                     to the archive:
+                        - archive1/
+                          - archive1.sigmf-meta
+                          - archive1.sigmf-data
         '''
         super(SigMFFile, self).__init__()
         self.data_file = None
@@ -183,6 +190,7 @@ class SigMFFile(SigMFMetafile):
             self.set_global_info(global_info)
         if data_file is not None:
             self.set_data_file(data_file, skip_checksum, map_readonly=map_readonly)
+        self.name = name
 
     def __len__(self):
         return self._memmap.shape[0]
@@ -212,6 +220,20 @@ class SigMFFile(SigMFMetafile):
             else:
                 raise ValueError("unhandled ndim in SigMFFile.__getitem__(); this shouldn't happen")
         return a
+    
+    def __eq__(self, other):
+        """Define equality between two `SigMFFile`s.
+
+        Rely on the `core:sha512` value in the metadata to decide whether
+        `data_file` is the same since the same sigmf archive could be extracted
+        twice to two different temp directories and the SigMFFiles should still
+        be equivalent.
+
+        """
+        if isinstance(other, SigMFFile):
+            return self._metadata == other._metadata
+
+        return False
 
     def _get_start_offset(self):
         """
@@ -511,13 +533,23 @@ class SigMFFile(SigMFMetafile):
         version = self.get_global_field(self.VERSION_KEY)
         validate.validate(self._metadata, self.get_schema())
 
-    def archive(self, name=None, fileobj=None):
+    def archive(self, sigmffile_name=None, archive_name=None, fileobj=None):
         """Dump contents to SigMF archive format.
 
-        `name` and `fileobj` are passed to SigMFArchive and are defined there.
+        `sigmffile_name` determines the directory and filenames inside the archive. If
+        not specified, you must have set the instance variable `self.name`
+
+        `arhive_name` is passed to SigMFArchive `name` and `fileobj` is passed to
+        SigMFArchive `fileobj`.
 
         """
-        archive = SigMFArchive(self, name, fileobj)
+        if sigmffile_name is not None:
+            self.name = sigmffile_name
+        
+        if archive_name is None:
+            archive_name = self.name
+        
+        archive = SigMFArchive([self], archive_name, fileobj)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -891,13 +923,13 @@ def get_dataset_filename_from_metadata(meta_fn, metadata=None):
 
 
 def fromarchive(archive_path, dir=None):
-    """Extract an archive and return a SigMFFile.
+    """Extract an archive and return containing SigMFFiles.
 
     The `dir` parameter is no longer used as this function has been changed to
     access SigMF archives without extracting them.
     """
     from .archivereader import SigMFArchiveReader
-    return SigMFArchiveReader(archive_path).sigmffile
+    return SigMFArchiveReader(archive_path).sigmffiles
 
 
 def fromfile(filename, skip_checksum=False):
