@@ -28,6 +28,7 @@ class SigMFArchiveReader():
     """
     def __init__(self, name=None, skip_checksum=False, map_readonly=True, archive_buffer=None):
         self.name = name
+        tar_obj = None
         try:
             if self.name is not None:
                 if not name.endswith(SIGMF_ARCHIVE_EXT):
@@ -89,7 +90,7 @@ class SigMFArchiveReader():
             if not data_found:
                 raise SigMFFileError('No .sigmf-data file found in archive!')
         finally:
-            tar_obj.close()
+            if tar_obj: tar_obj.close()
 
     def __len__(self):
         return len(self.sigmffiles)
