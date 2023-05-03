@@ -56,7 +56,7 @@ def test_access_data_without_untar(test_sigmffile):
 def test_extract_single_recording(test_sigmffile):
     with tempfile.NamedTemporaryFile() as tf:
         expected_sigmffile = test_sigmffile
-        arch = SigMFArchive([expected_sigmffile], name=tf.name)
+        arch = SigMFArchive(expected_sigmffile, name=tf.name)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 1
         actual_sigmffile = reader[0]

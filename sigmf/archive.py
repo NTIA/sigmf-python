@@ -10,7 +10,9 @@ import os
 import shutil
 import tarfile
 import tempfile
-from typing import BinaryIO, Iterable
+from typing import BinaryIO, Iterable, Union
+
+import sigmf
 
 
 from .error import SigMFFileError
@@ -46,8 +48,12 @@ class SigMFArchive():
                     supposed to be at position 0. `fileobj` won't be closed. If
                     `fileobj` is given, `name` has no effect.
     """
-    def __init__(self, sigmffiles : Iterable["SigMFFile"], name : str = None, fileobj : BinaryIO =None):
-        self.sigmffiles = sigmffiles
+    def __init__(self, sigmffiles : Union["SigMFFile", Iterable["SigMFFile"]], name : str = None, fileobj : BinaryIO =None):
+
+        if isinstance(sigmffiles[0], sigmf.sigmffile.SigMFFile):
+            self.sigmffiles = sigmffiles
+        else:
+            self.sigmffiles = [sigmffiles]
             
         self.name = name
         self.fileobj = fileobj
