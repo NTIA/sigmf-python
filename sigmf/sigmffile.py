@@ -549,7 +549,7 @@ class SigMFFile(SigMFMetafile):
         if archive_name is None:
             archive_name = self.name
         
-        archive = SigMFArchive([self], archive_name, fileobj)
+        archive = SigMFArchive(self, archive_name, fileobj)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
