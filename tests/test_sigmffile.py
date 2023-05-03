@@ -23,9 +23,11 @@ import shutil
 import tempfile
 import json
 import numpy as np
+import pytest
 import unittest
 
 from sigmf import sigmffile, utils
+from sigmf.error import SigMFFileError
 from sigmf.sigmffile import SigMFFile
 
 from .testdata import *
@@ -254,3 +256,21 @@ def test_captures_checking():
     assert (160,224) == sigmf4.get_capture_byte_boundarys(1)
     assert np.array_equal(np.array(range(64)), sigmf4.read_samples_in_capture(0,autoscale=False)[:,0])
     assert np.array_equal(np.array(range(64,96)), sigmf4.read_samples_in_capture(1,autoscale=False)[:,1])
+
+
+def test_archive_no_name_raises_exception():
+    "Exception should be raised when no name set in SigMFFile constructor or in archive() method for sigmffile_name parameter"
+    with tempfile.NamedTemporaryFile() as temp_file:
+        data = np.ones(128, dtype=np.float32)
+        data.tofile(temp_file.name)
+        sigmffile = SigMFFile(
+            data_file=temp_file.name,
+            global_info={
+                SigMFFile.DATATYPE_KEY: 'rf32_le',
+                SigMFFile.NUM_CHANNELS_KEY: 1,
+            },
+        )
+        with pytest.raises(SigMFFileError):
+            sigmffile.archive()
+        with pytest.raises(SigMFFileError):
+            sigmffile.archive(archive_name="test")
