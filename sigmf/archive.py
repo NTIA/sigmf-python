@@ -35,27 +35,27 @@ class SigMFArchive():
 
       sigmffile -- An iterable of SigMFFile objects with valid metadata and data_files
 
-      name      -- path to archive file to create. If file exists, overwrite.
-                    If `name` doesn't end in .sigmf, it will be appended. The
+      path      -- path to archive file to create. If file exists, overwrite.
+                    If `path` doesn't end in .sigmf, it will be appended. The
                     `self.path` instance variable will be updated upon
                     successful writing of the archive to point to the final
                     archive path.
 
 
       fileobj   -- If `fileobj` is specified, it is used as an alternative to
-                    a file object opened in binary mode for `name`. If
+                    a file object opened in binary mode for `path`. If
                     `fileobj` is an open tarfile, it will be appended to. It is
                     supposed to be at position 0. `fileobj` won't be closed. If
-                    `fileobj` is given, `name` has no effect.
+                    `fileobj` is given, `path` has no effect.
     """
-    def __init__(self, sigmffiles : Union["SigMFFile", Iterable["SigMFFile"]], name : str = None, fileobj : BinaryIO =None):
+    def __init__(self, sigmffiles : Union["SigMFFile", Iterable["SigMFFile"]], path : Union[str, os.PathLike] = None, fileobj : BinaryIO =None):
 
         if isinstance(sigmffiles[0], sigmf.sigmffile.SigMFFile):
             self.sigmffiles = sigmffiles
         else:
             self.sigmffiles = [sigmffiles]
             
-        self.name = name
+        self.path = str(path)
         self.fileobj = fileobj
 
         self._check_input()
@@ -101,25 +101,25 @@ class SigMFArchive():
         self.path = sigmf_archive.name
 
     def _check_input(self):
-        self._ensure_name_has_correct_extension()
+        self._ensure_path_has_correct_extension()
         for sigmffile in self.sigmffiles:
             self._ensure_sigmffile_name_set(sigmffile)
             self._ensure_data_file_set(sigmffile)
             self._validate_sigmffile_metadata(sigmffile)
 
-    def _ensure_name_has_correct_extension(self):
-        name = self.name
-        if name is None:
+    def _ensure_path_has_correct_extension(self):
+        path = self.path
+        if path is None:
             return
 
-        has_extension = "." in name
-        has_correct_extension = name.endswith(SIGMF_ARCHIVE_EXT)
+        has_extension = "." in path
+        has_correct_extension = path.endswith(SIGMF_ARCHIVE_EXT)
         if has_extension and not has_correct_extension:
-            apparent_ext = os.path.splitext(name)[-1]
+            apparent_ext = os.path.splitext(path)[-1]
             err = "extension {} != {}".format(apparent_ext, SIGMF_ARCHIVE_EXT)
             raise SigMFFileError(err)
 
-        self.name = name if has_correct_extension else name + SIGMF_ARCHIVE_EXT
+        self.path = path if has_correct_extension else path + SIGMF_ARCHIVE_EXT
 
     @staticmethod
     def _ensure_sigmffile_name_set(sigmffile):
@@ -138,10 +138,10 @@ class SigMFArchive():
         sigmffile.validate()
 
     def _get_archive_name(self):
-        if self.fileobj and not self.name:
+        if self.fileobj and not self.path:
             pathname = self.fileobj.name
         else:
-            pathname = self.name
+            pathname = self.path
 
         filename = os.path.split(pathname)[-1]
         archive_name, archive_ext = os.path.splitext(filename)
@@ -154,7 +154,7 @@ class SigMFArchive():
             if self.fileobj:
                 err = "fileobj {!r} is not byte-writable".format(self.fileobj)
             else:
-                err = "can't open {!r} for writing".format(self.name)
+                err = "can't open {!r} for writing".format(self.path)
 
             raise SigMFFileError(err)
 
@@ -165,6 +165,6 @@ class SigMFArchive():
             fileobj = self.fileobj
             fileobj.write(bytes())  # force exception if not byte-writable
         else:
-            fileobj = open(self.name, "wb")
+            fileobj = open(self.path, "wb")
 
         return fileobj

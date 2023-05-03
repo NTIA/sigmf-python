@@ -1,5 +1,6 @@
 import codecs
 import json
+from pathlib import Path
 import tarfile
 import tempfile
 from os import path
@@ -116,7 +117,7 @@ def test_sf_fromarchive_multirec(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile(delete=True) as tf:
         # Create a multi-recording archive
         input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
-        arch = SigMFArchive(input_sigmffiles, name=tf.name)
+        arch = SigMFArchive(input_sigmffiles, path=tf.name)
         output_sigmf_files = sigmffile.fromarchive(archive_path=arch.path)
         assert len(output_sigmf_files) == 2
         assert input_sigmffiles == output_sigmf_files
@@ -169,3 +170,11 @@ def test_tarfile_type(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
         assert sigmf_tarfile.format == tarfile.PAX_FORMAT
+
+def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
+    with tempfile.NamedTemporaryFile() as t:
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        arch = SigMFArchive(input_sigmffiles, path=Path(t.name))
+        output_sigmf_files = sigmffile.fromarchive(archive_path=arch.path)
+        assert len(output_sigmf_files) == 2
+        assert input_sigmffiles == output_sigmf_files

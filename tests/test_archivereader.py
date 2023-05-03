@@ -56,7 +56,7 @@ def test_access_data_without_untar(test_sigmffile):
 def test_extract_single_recording(test_sigmffile):
     with tempfile.NamedTemporaryFile() as tf:
         expected_sigmffile = test_sigmffile
-        arch = SigMFArchive(expected_sigmffile, name=tf.name)
+        arch = SigMFArchive(expected_sigmffile, path=tf.name)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 1
         actual_sigmffile = reader[0]
@@ -67,7 +67,7 @@ def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as tf:
         # Create a multi-recording archive
         expected_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
-        arch = SigMFArchive(expected_sigmffiles, name=tf.name)
+        arch = SigMFArchive(expected_sigmffiles, path=tf.name)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 2
         for expected in expected_sigmffiles:
