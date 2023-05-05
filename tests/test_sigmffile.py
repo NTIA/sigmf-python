@@ -38,7 +38,7 @@ class TestClassMethods(unittest.TestCase):
         '''assure tests have a valid SigMF object to work with'''
         _, temp_path = tempfile.mkstemp()
         TEST_FLOAT32_DATA_1.tofile(temp_path)
-        self.sigmf_object = SigMFFile(TEST_METADATA_1, data_file=temp_path)
+        self.sigmf_object = SigMFFile("test", TEST_METADATA_1, data_file=temp_path)
 
     def test_iterator_basic(self):
         '''make sure default batch_size works'''
@@ -66,28 +66,28 @@ def simulate_capture(sigmf_md, n, capture_len):
 
 
 def test_default_constructor():
-    SigMFFile()
+    SigMFFile(name="test")
 
 
 def test_set_non_required_global_field():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.set_global_field('this_is:not_in_the_schema', None)
 
 
 def test_add_capture():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.add_capture(start_index=0, metadata={})
 
 
 def test_add_annotation():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.add_capture(start_index=0)
     meta = {"latitude": 40.0, "longitude": -105.0}
     sigf.add_annotation(start_index=0, length=128, metadata=meta)
 
 
 def test_add_annotation_with_duplicate_key():
-    f = SigMFFile()
+    f = SigMFFile(name="test")
     f.add_capture(start_index=0)
     m1 = {"latitude": 40.0, "longitude": -105.0}
     f.add_annotation(start_index=0, length=128, metadata=m1)
@@ -100,7 +100,7 @@ def test_fromarchive(test_sigmffile):
     print("test_sigmffile is:\n", test_sigmffile)
     tf = tempfile.mkstemp()[1]
     td = tempfile.mkdtemp()
-    archive_path = test_sigmffile.archive(archive_name=tf)
+    archive_path = test_sigmffile.archive(file_path=tf)
     result = sigmffile.fromarchive(archive_path=archive_path, dir=td)
     assert len(result) == 1
     result = result[0]
@@ -110,7 +110,7 @@ def test_fromarchive(test_sigmffile):
 
 
 def test_add_multiple_captures_and_annotations():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     for idx in range(3):
         simulate_capture(sigf, idx, 1024)
 
@@ -138,6 +138,7 @@ def test_multichannel_types():
                 # for real or complex
                 check_count = raw_count * 1 # deepcopy
                 temp_signal = SigMFFile(
+                    name="test",
                     data_file=temp_path,
                     global_info={
                         SigMFFile.DATATYPE_KEY: f'{complex_prefix}{key}_le',
@@ -163,6 +164,7 @@ def test_multichannel_seek():
     # write some dummy data and read back
     np.arange(18, dtype=np.uint16).tofile(temp_path)
     temp_signal = SigMFFile(
+        name="test",
         data_file=temp_path,
         global_info={
             SigMFFile.DATATYPE_KEY: 'cu16_le',
@@ -192,7 +194,7 @@ def test_key_validity():
 
 def test_ordered_metadata():
     '''check to make sure the metadata is sorted as expected'''
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     top_sort_order = ['global', 'captures', 'annotations']
     for kdx, key in enumerate(sigf.ordered_metadata()):
         assert kdx == top_sort_order.index(key)
@@ -256,21 +258,3 @@ def test_captures_checking():
     assert (160,224) == sigmf4.get_capture_byte_boundarys(1)
     assert np.array_equal(np.array(range(64)), sigmf4.read_samples_in_capture(0,autoscale=False)[:,0])
     assert np.array_equal(np.array(range(64,96)), sigmf4.read_samples_in_capture(1,autoscale=False)[:,1])
-
-
-def test_archive_no_name_raises_exception():
-    "Exception should be raised when no name set in SigMFFile constructor or in archive() method for sigmffile_name parameter"
-    with tempfile.NamedTemporaryFile() as temp_file:
-        data = np.ones(128, dtype=np.float32)
-        data.tofile(temp_file.name)
-        sigmffile = SigMFFile(
-            data_file=temp_file.name,
-            global_info={
-                SigMFFile.DATATYPE_KEY: 'rf32_le',
-                SigMFFile.NUM_CHANNELS_KEY: 1,
-            },
-        )
-        with pytest.raises(SigMFFileError):
-            sigmffile.archive()
-        with pytest.raises(SigMFFileError):
-            sigmffile.archive(archive_name="test")

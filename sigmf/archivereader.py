@@ -45,6 +45,7 @@ class SigMFArchiveReader():
 
             json_contents = None
             data_offset_size = None
+            sigmffile_name = None
             self.sigmffiles = []
             data_found = False
 
@@ -64,6 +65,10 @@ class SigMFArchiveReader():
                         with tar_obj.extractfile(memb) as memb_fid:
                             json_contents = memb_fid.read()
 
+                        _, sigmffile_name = os.path.split(memb.name)
+                        sigmffile_name, _ = os.path.splitext(sigmffile_name)
+                        
+
                     elif memb.name.endswith(SIGMF_DATASET_EXT):
                         data_offset_size = memb.offset_data, memb.size
                         data_found = True
@@ -74,7 +79,7 @@ class SigMFArchiveReader():
                     print('A member of type', memb.type, 'and name', memb.name, 'was found but not handled, just FYI.')
 
                 if data_offset_size is not None and json_contents is not None:
-                    sigmffile = SigMFFile(metadata=json_contents)
+                    sigmffile = SigMFFile(sigmffile_name, metadata=json_contents)
                     valid_md = sigmffile.validate()
 
                     sigmffile.set_data_file(self.name, data_buffer=archive_buffer, skip_checksum=skip_checksum, offset=data_offset_size[0],
@@ -85,6 +90,7 @@ class SigMFArchiveReader():
                     self.sigmffiles.append(sigmffile)
                     data_offset_size = None
                     json_contents = None
+                    sigmffile_name = None
                     
 
             if not data_found:

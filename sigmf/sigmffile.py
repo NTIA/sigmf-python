@@ -148,7 +148,7 @@ class SigMFFile(SigMFMetafile):
     ]
     VALID_KEYS = {GLOBAL_KEY: VALID_GLOBAL_KEYS, CAPTURE_KEY: VALID_CAPTURE_KEYS, ANNOTATION_KEY: VALID_ANNOTATION_KEYS}
 
-    def __init__(self, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True, name=None):
+    def __init__(self, name, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True):
         '''
         API for SigMF I/O
 
@@ -533,23 +533,17 @@ class SigMFFile(SigMFMetafile):
         version = self.get_global_field(self.VERSION_KEY)
         validate.validate(self._metadata, self.get_schema())
 
-    def archive(self, sigmffile_name=None, archive_name=None, fileobj=None):
+    def archive(self, file_path=None, fileobj=None):
         """Dump contents to SigMF archive format.
 
-        `sigmffile_name` determines the directory and filenames inside the archive. If
-        not specified, you must have set the instance variable `self.name`
-
-        `arhive_name` is passed to SigMFArchive `name` and `fileobj` is passed to
+        `file_path` is passed to SigMFArchive `path` and `fileobj` is passed to
         SigMFArchive `fileobj`.
 
         """
-        if sigmffile_name is not None:
-            self.name = sigmffile_name
+        if file_path is None:
+            file_path = self.name
         
-        if archive_name is None:
-            archive_name = self.name
-        
-        archive = SigMFArchive(self, archive_name, fileobj)
+        archive = SigMFArchive(self, file_path, fileobj)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -976,7 +970,7 @@ def fromfile(filename, skip_checksum=False):
         meta_fp.close()
 
         data_fn = get_dataset_filename_from_metadata(meta_fn, metadata)
-        return SigMFFile(metadata=metadata, data_file=data_fn, skip_checksum=skip_checksum)
+        return SigMFFile(name=fns['base_fn'], metadata=metadata, data_file=data_fn, skip_checksum=skip_checksum)
 
 
 def get_sigmf_filenames(filename):

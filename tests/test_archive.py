@@ -15,8 +15,8 @@ from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
 from .testdata import TEST_FLOAT32_DATA_1, TEST_METADATA_1
 
 
-def create_test_archive(test_sigmffile, tmpfile, sigmffile_name="test"):
-    sigmf_archive = test_sigmffile.archive(sigmffile_name=sigmffile_name, fileobj=tmpfile)
+def create_test_archive(test_sigmffile, tmpfile):
+    sigmf_archive = test_sigmffile.archive(fileobj=tmpfile)
     sigmf_tarfile = tarfile.open(sigmf_archive, mode="r", format=tarfile.PAX_FORMAT)
     return sigmf_tarfile
 
@@ -25,20 +25,20 @@ def test_without_data_file_throws_fileerror(test_sigmffile):
     test_sigmffile.data_file = None
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(error.SigMFFileError):
-            test_sigmffile.archive(archive_name=temp.name)
+            test_sigmffile.archive(file_path=temp.name)
 
 
 def test_invalid_md_throws_validationerror(test_sigmffile):
     del test_sigmffile._metadata["global"]["core:datatype"]  # required field
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(jsonschema.exceptions.ValidationError):
-            test_sigmffile.archive(archive_name=temp.name)
+            test_sigmffile.archive(file_path=temp.name)
 
 
 def test_name_wrong_extension_throws_fileerror(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(error.SigMFFileError):
-            test_sigmffile.archive(archive_name=temp.name + ".zip")
+            test_sigmffile.archive(file_path=temp.name + ".zip")
 
 
 def test_fileobj_extension_ignored(test_sigmffile):
@@ -48,7 +48,7 @@ def test_fileobj_extension_ignored(test_sigmffile):
 
 def test_name_used_in_fileobj(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
-        sigmf_archive = test_sigmffile.archive(archive_name="testarchive", fileobj=temp)
+        sigmf_archive = test_sigmffile.archive(file_path="testarchive", fileobj=temp)
         sigmf_tarfile = tarfile.open(sigmf_archive, mode="r")
         basedir, file1, file2 = sigmf_tarfile.getmembers()
         assert basedir.name == test_sigmffile.name
@@ -79,7 +79,7 @@ def test_unwritable_name_throws_fileerror(test_sigmffile):
     # so use invalid filename
     unwritable_file = '/bad_name/'
     with pytest.raises(error.SigMFFileError):
-        test_sigmffile.archive(archive_name=unwritable_file)
+        test_sigmffile.archive(file_path=unwritable_file)
 
 
 def test_tarfile_layout(test_sigmffile):
@@ -124,12 +124,12 @@ def test_sf_fromarchive_multirec(test_sigmffile, test_alternate_sigmffile):
 
 
 
-def test_multirec_archive_into_fileobj(test_sigmffile):
+def test_multirec_archive_into_fileobj(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:
         # add first sigmffile to the fileobj t
-        create_test_archive(test_sigmffile, t, sigmffile_name="test1")
+        create_test_archive(test_sigmffile, t)
         # add a second one to the same fileobj
-        multirec_tar = create_test_archive(test_sigmffile, t, sigmffile_name="test2")
+        multirec_tar = create_test_archive(test_alternate_sigmffile, t)
         members = multirec_tar.getmembers()
         assert len(members) == 6  # 2 directories and 2 files per directory
 
@@ -178,3 +178,22 @@ def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
         output_sigmf_files = sigmffile.fromarchive(archive_path=arch.path)
         assert len(output_sigmf_files) == 2
         assert input_sigmffiles == output_sigmf_files
+
+
+def test_archive_names(test_sigmffile):
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
+        a = SigMFArchive(test_sigmffile, t.name)
+        assert a.path == t.name
+        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        assert observed_sigmffile.name == test_sigmffile.name
+
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
+        archive_path = test_sigmffile.archive(t.name)
+        assert archive_path == t.name
+        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        assert observed_sigmffile.name == test_sigmffile.name
+
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
+        test_sigmffile.tofile(t.name, toarchive=True)
+        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        assert observed_sigmffile.name == test_sigmffile.name

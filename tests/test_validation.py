@@ -32,7 +32,7 @@ from .testdata import TEST_FLOAT32_DATA_1, TEST_METADATA_1
 def test_valid_data():
     '''assure the supplied metadata is OK'''
     invalid_metadata = dict(TEST_METADATA_1)
-    SigMFFile(TEST_METADATA_1).validate()
+    SigMFFile("test", TEST_METADATA_1).validate()
 
 class FailingCases(unittest.TestCase):
     '''Cases where the validator should throw an exception.'''
@@ -86,4 +86,4 @@ class FailingCases(unittest.TestCase):
         TEST_FLOAT32_DATA_1.tofile(temp_path)
         self.metadata[SigMFFile.GLOBAL_KEY][SigMFFile.HASH_KEY] = 'derp'
         with self.assertRaises(sigmf.error.SigMFFileError):
-            SigMFFile(metadata=self.metadata, data_file=temp_path)
+            SigMFFile(name="test", metadata=self.metadata, data_file=temp_path)

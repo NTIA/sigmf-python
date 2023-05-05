@@ -47,7 +47,7 @@ def test_access_data_without_untar(test_sigmffile):
             test_sigmffile.data_file = None
             with tempfile.NamedTemporaryFile() as temp:
                 b.tofile(temp.name)
-                meta = SigMFFile(data_file=temp.name, global_info=global_info)
+                meta = SigMFFile("test", data_file=temp.name, global_info=global_info)
                 meta.add_capture(0, metadata=capture_info)
                 meta.tofile(archive_filename, toarchive=True)
 
