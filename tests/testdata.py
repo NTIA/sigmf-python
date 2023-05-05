@@ -51,6 +51,19 @@ TEST_METADATA_2 = {
     }
 }
 
+TEST_FLOAT32_DATA_3 = np.arange(32, 48, dtype=np.float32)
+
+TEST_METADATA_3 = {
+    SigMFFile.ANNOTATION_KEY: [{SigMFFile.LENGTH_INDEX_KEY: 16, SigMFFile.START_INDEX_KEY: 0}],
+    SigMFFile.CAPTURE_KEY: [{SigMFFile.START_INDEX_KEY: 0}],
+    SigMFFile.GLOBAL_KEY:  {
+        SigMFFile.DATATYPE_KEY: 'rf32_le',
+        SigMFFile.HASH_KEY: '089753bd48a1724c485e822eaf4d510491e4e54faa83cc3e7b3f18a9f651813190862aa97c922278454c66f20a741050762e008cbe4f96f3bd0dcdb7d720179d',
+        SigMFFile.NUM_CHANNELS_KEY: 1,
+        SigMFFile.VERSION_KEY: __version__
+    }
+}
+
 # Data0 is a test of a compliant two capture recording
 TEST_U8_DATA0 = list(range(256))
 TEST_U8_META0 = {

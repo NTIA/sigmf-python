@@ -28,7 +28,8 @@ import unittest
 
 from sigmf import sigmffile, utils
 from sigmf.error import SigMFFileError
-from sigmf.sigmffile import SigMFFile
+from sigmf.sigmffile import SigMFFile, fromarchive
+from sigmf.archive import SigMFArchive
 
 from .testdata import *
 
@@ -102,11 +103,42 @@ def test_fromarchive(test_sigmffile):
     td = tempfile.mkdtemp()
     archive_path = test_sigmffile.archive(file_path=tf)
     result = sigmffile.fromarchive(archive_path=archive_path, dir=td)
-    assert len(result) == 1
-    result = result[0]
-    assert result._metadata == test_sigmffile._metadata == TEST_METADATA_1
+    assert result == test_sigmffile
     os.remove(tf)
     shutil.rmtree(td)
+
+def test_from_archive_multiple_recordings(test_sigmffile, test_alternate_sigmffile, test_alternate_sigmffile_2):
+    # single recording
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        test_sigmffile.archive(fileobj=t_file)
+        single_sigmffile = fromarchive(path)
+        assert isinstance(single_sigmffile, SigMFFile)
+        assert single_sigmffile == test_sigmffile
+
+    # 2 recordings
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        SigMFArchive([test_sigmffile, test_alternate_sigmffile], fileobj=t_file)
+        sigmffile_one, sigmffile_two = fromarchive(path)
+        assert isinstance(sigmffile_one, SigMFFile)
+        assert sigmffile_one == test_sigmffile
+        assert isinstance(sigmffile_two, SigMFFile)
+        assert sigmffile_two == test_alternate_sigmffile
+
+
+    # 3 recordings
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        SigMFArchive([test_sigmffile, test_alternate_sigmffile, test_alternate_sigmffile_2], fileobj=t_file)
+        list_of_sigmffiles = fromarchive(path)
+        assert len(list_of_sigmffiles) == 3
+        assert isinstance(list_of_sigmffiles[0], SigMFFile)
+        assert list_of_sigmffiles[0] == test_sigmffile
+        assert isinstance(list_of_sigmffiles[1], SigMFFile)
+        assert list_of_sigmffiles[1] == test_alternate_sigmffile
+        assert isinstance(list_of_sigmffiles[2], SigMFFile)
+        assert list_of_sigmffiles[2] == test_alternate_sigmffile_2
 
 
 def test_add_multiple_captures_and_annotations():

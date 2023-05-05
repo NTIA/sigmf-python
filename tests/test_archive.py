@@ -184,16 +184,16 @@ def test_archive_names(test_sigmffile):
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         a = SigMFArchive(test_sigmffile, t.name)
         assert a.path == t.name
-        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        observed_sigmffile = sigmffile.fromarchive(t.name)
         assert observed_sigmffile.name == test_sigmffile.name
 
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         archive_path = test_sigmffile.archive(t.name)
         assert archive_path == t.name
-        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        observed_sigmffile = sigmffile.fromarchive(t.name)
         assert observed_sigmffile.name == test_sigmffile.name
 
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         test_sigmffile.tofile(t.name, toarchive=True)
-        observed_sigmffile = sigmffile.fromarchive(t.name)[0]
+        observed_sigmffile = sigmffile.fromarchive(t.name)
         assert observed_sigmffile.name == test_sigmffile.name

@@ -923,7 +923,9 @@ def fromarchive(archive_path, dir=None):
     access SigMF archives without extracting them.
     """
     from .archivereader import SigMFArchiveReader
-    return SigMFArchiveReader(archive_path).sigmffiles
+    sigmffiles = SigMFArchiveReader(archive_path).sigmffiles
+    if len(sigmffiles) == 1: return sigmffiles[0]
+    else: return sigmffiles
 
 
 def fromfile(filename, skip_checksum=False):
