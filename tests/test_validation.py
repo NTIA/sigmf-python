@@ -34,6 +34,7 @@ def test_valid_data():
     invalid_metadata = dict(TEST_METADATA_1)
     SigMFFile("test", TEST_METADATA_1).validate()
 
+
 class FailingCases(unittest.TestCase):
     '''Cases where the validator should throw an exception.'''
     def setUp(self):
@@ -45,7 +46,7 @@ class FailingCases(unittest.TestCase):
         with self.assertRaises(ValidationError):
             SigMFFile(self.metadata).validate()
 
-    def test_extra_top_level_key(self):
+    def test_invalid_label(self):
         '''label must be less than 20 chars'''
         self.metadata[SigMFFile.ANNOTATION_KEY][0][SigMFFile.LABEL_KEY] = 'a' * 21
         with self.assertRaises(ValidationError):

@@ -1,15 +1,10 @@
-import codecs
-import json
-import tarfile
 import tempfile
-from os import path
 
 import numpy as np
-import pytest
 
-from sigmf import error
 from sigmf import SigMFFile, SigMFArchiveReader
-from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
+from sigmf.archive import SigMFArchive
+
 
 def test_access_data_without_untar(test_sigmffile):
     global_info = {
@@ -24,7 +19,7 @@ def test_access_data_without_untar(test_sigmffile):
             "core:datetime": "2021-06-18T23:17:51.163959Z",
             "core:sample_start": 0
         }
-    
+
     NUM_ROWS = 5
 
     for dt in "ri16_le", "ci16_le", "rf32_le", "rf64_le", "cf32_le", "cf64_le":
@@ -33,7 +28,7 @@ def test_access_data_without_untar(test_sigmffile):
             global_info["core:num_channels"] = num_chan
             base_filename = dt + '_' + str(num_chan)
             archive_filename = base_filename + '.sigmf'
-    
+
             a = np.arange(NUM_ROWS * num_chan * (2 if 'c' in dt else 1))
             if 'i16' in dt:
                 b = a.astype(np.int16)
@@ -43,7 +38,7 @@ def test_access_data_without_untar(test_sigmffile):
                 b = a.astype(np.float64)
             else:
                 raise ValueError('whoops')
-    
+
             test_sigmffile.data_file = None
             with tempfile.NamedTemporaryFile() as temp:
                 b.tofile(temp.name)
@@ -52,6 +47,7 @@ def test_access_data_without_untar(test_sigmffile):
                 meta.tofile(archive_filename, toarchive=True)
 
                 archi = SigMFArchiveReader(archive_filename, skip_checksum=True)
+
 
 def test_extract_single_recording(test_sigmffile):
     with tempfile.NamedTemporaryFile() as tf:

@@ -48,7 +48,8 @@ def test_fileobj_extension_ignored(test_sigmffile):
 
 def test_name_used_in_fileobj(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
-        sigmf_archive = test_sigmffile.archive(file_path="testarchive", fileobj=temp)
+        sigmf_archive = test_sigmffile.archive(file_path="testarchive",
+                                               fileobj=temp)
         sigmf_tarfile = tarfile.open(sigmf_archive, mode="r")
         basedir, file1, file2 = sigmf_tarfile.getmembers()
         assert basedir.name == test_sigmffile.name
@@ -112,6 +113,7 @@ def test_tarfile_names_and_extensions(test_sigmffile):
         assert path.split(file2_name)[-1] == test_sigmffile.name
         assert file2_ext in file_extensions
 
+
 def test_sf_fromarchive_multirec(test_sigmffile, test_alternate_sigmffile):
     """`SigMFFile.fromarchive` should return list of SigMFFiles."""
     with tempfile.NamedTemporaryFile(delete=True) as tf:
@@ -123,8 +125,8 @@ def test_sf_fromarchive_multirec(test_sigmffile, test_alternate_sigmffile):
         assert input_sigmffiles == output_sigmf_files
 
 
-
-def test_multirec_archive_into_fileobj(test_sigmffile, test_alternate_sigmffile):
+def test_multirec_archive_into_fileobj(test_sigmffile,
+                                       test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:
         # add first sigmffile to the fileobj t
         create_test_archive(test_sigmffile, t)
@@ -170,6 +172,7 @@ def test_tarfile_type(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
         assert sigmf_tarfile.format == tarfile.PAX_FORMAT
+
 
 def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:

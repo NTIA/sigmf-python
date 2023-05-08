@@ -148,7 +148,13 @@ class SigMFFile(SigMFMetafile):
     ]
     VALID_KEYS = {GLOBAL_KEY: VALID_GLOBAL_KEYS, CAPTURE_KEY: VALID_CAPTURE_KEYS, ANNOTATION_KEY: VALID_ANNOTATION_KEYS}
 
-    def __init__(self, name, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True):
+    def __init__(self,
+                 name,
+                 metadata=None,
+                 data_file=None,
+                 global_info=None,
+                 skip_checksum=False,
+                 map_readonly=True):
         '''
         API for SigMF I/O
 
@@ -220,7 +226,7 @@ class SigMFFile(SigMFMetafile):
             else:
                 raise ValueError("unhandled ndim in SigMFFile.__getitem__(); this shouldn't happen")
         return a
-    
+
     def __eq__(self, other):
         """Define equality between two `SigMFFile`s.
 
@@ -542,7 +548,7 @@ class SigMFFile(SigMFMetafile):
         """
         if file_path is None:
             file_path = self.name
-        
+
         archive = SigMFArchive(self, file_path, fileobj)
         return archive.path
 
@@ -924,8 +930,10 @@ def fromarchive(archive_path, dir=None):
     """
     from .archivereader import SigMFArchiveReader
     sigmffiles = SigMFArchiveReader(archive_path).sigmffiles
-    if len(sigmffiles) == 1: return sigmffiles[0]
-    else: return sigmffiles
+    if len(sigmffiles) == 1:
+        return sigmffiles[0]
+    else:
+        return sigmffiles
 
 
 def fromfile(filename, skip_checksum=False):
@@ -972,7 +980,10 @@ def fromfile(filename, skip_checksum=False):
         meta_fp.close()
 
         data_fn = get_dataset_filename_from_metadata(meta_fn, metadata)
-        return SigMFFile(name=fns['base_fn'], metadata=metadata, data_file=data_fn, skip_checksum=skip_checksum)
+        return SigMFFile(name=fns['base_fn'],
+                         metadata=metadata,
+                         data_file=data_fn,
+                         skip_checksum=skip_checksum)
 
 
 def get_sigmf_filenames(filename):

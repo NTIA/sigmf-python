@@ -34,7 +34,8 @@ class SigMFArchive():
 
     Parameters:
 
-      sigmffile -- An iterable of SigMFFile objects with valid metadata and data_files
+      sigmffile -- An iterable of SigMFFile objects with valid metadata and
+                    data_files
 
       path      -- path to archive file to create. If file exists, overwrite.
                     If `path` doesn't end in .sigmf, it will be appended. The
@@ -49,18 +50,22 @@ class SigMFArchive():
                     supposed to be at position 0. `fileobj` won't be closed. If
                     `fileobj` is given, `path` has no effect.
     """
-    def __init__(self, sigmffiles : Union["SigMFFile", Iterable["SigMFFile"]], path : Union[str, os.PathLike] = None, fileobj : BinaryIO =None):
+    def __init__(self,
+                 sigmffiles: Union["sigmf.sigmffile.SigMFFile",
+                                   Iterable["sigmf.sigmffile.SigMFFile"]],
+                 path: Union[str, os.PathLike] = None,
+                 fileobj: BinaryIO = None):
 
         if isinstance(sigmffiles, sigmf.sigmffile.SigMFFile):
             self.sigmffiles = [sigmffiles]
-        elif hasattr(collections, "Iterable") and isinstance(sigmffiles, collections.Iterable):
+        elif (hasattr(collections, "Iterable") and
+              isinstance(sigmffiles, collections.Iterable)):
             self.sigmffiles = sigmffiles
-        elif isinstance(sigmffiles, collections.abc.Iterable): # python 3.10
+        elif isinstance(sigmffiles, collections.abc.Iterable):  # python 3.10
             self.sigmffiles = sigmffiles
         else:
             raise SigMFFileError("Unknown type for sigmffiles argument!")
-            
-            
+
         self.path = str(path)
         self.fileobj = fileobj
 
@@ -73,11 +78,11 @@ class SigMFArchive():
                                             fileobj=sigmf_fileobj,
                                             format=tarfile.PAX_FORMAT)
         except tarfile.ReadError:
-             # fileobj doesn't contain any archives yet, so reopen in 'w' mode
+            # fileobj doesn't contain any archives yet, so reopen in 'w' mode
             sigmf_archive = tarfile.TarFile(mode='w',
                                             fileobj=sigmf_fileobj,
                                             format=tarfile.PAX_FORMAT)
-            
+
         def chmod(tarinfo):
             if tarinfo.isdir():
                 tarinfo.mode = 0o755  # dwrxw-rw-r
@@ -132,7 +137,7 @@ class SigMFArchive():
         if not sigmffile.name:
             err = "the `name` attribute must be set to pass to `SigMFArchive`"
             raise SigMFFileError(err)
-    
+
     @staticmethod
     def _ensure_data_file_set(sigmffile):
         if not sigmffile.data_file:

@@ -23,11 +23,9 @@ import shutil
 import tempfile
 import json
 import numpy as np
-import pytest
 import unittest
 
 from sigmf import sigmffile, utils
-from sigmf.error import SigMFFileError
 from sigmf.sigmffile import SigMFFile, fromarchive
 from sigmf.archive import SigMFArchive
 
@@ -39,7 +37,9 @@ class TestClassMethods(unittest.TestCase):
         '''assure tests have a valid SigMF object to work with'''
         _, temp_path = tempfile.mkstemp()
         TEST_FLOAT32_DATA_1.tofile(temp_path)
-        self.sigmf_object = SigMFFile("test", TEST_METADATA_1, data_file=temp_path)
+        self.sigmf_object = SigMFFile("test",
+                                      TEST_METADATA_1,
+                                      data_file=temp_path)
 
     def test_iterator_basic(self):
         '''make sure default batch_size works'''
@@ -107,7 +107,10 @@ def test_fromarchive(test_sigmffile):
     os.remove(tf)
     shutil.rmtree(td)
 
-def test_from_archive_multiple_recordings(test_sigmffile, test_alternate_sigmffile, test_alternate_sigmffile_2):
+
+def test_fromarchive_multi_recording(test_sigmffile,
+                                     test_alternate_sigmffile,
+                                     test_alternate_sigmffile_2):
     # single recording
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
@@ -119,18 +122,21 @@ def test_from_archive_multiple_recordings(test_sigmffile, test_alternate_sigmffi
     # 2 recordings
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
-        SigMFArchive([test_sigmffile, test_alternate_sigmffile], fileobj=t_file)
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        SigMFArchive(input_sigmffiles, fileobj=t_file)
         sigmffile_one, sigmffile_two = fromarchive(path)
         assert isinstance(sigmffile_one, SigMFFile)
         assert sigmffile_one == test_sigmffile
         assert isinstance(sigmffile_two, SigMFFile)
         assert sigmffile_two == test_alternate_sigmffile
 
-
     # 3 recordings
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
-        SigMFArchive([test_sigmffile, test_alternate_sigmffile, test_alternate_sigmffile_2], fileobj=t_file)
+        input_sigmffiles = [test_sigmffile,
+                            test_alternate_sigmffile,
+                            test_alternate_sigmffile_2]
+        SigMFArchive(input_sigmffiles, fileobj=t_file)
         list_of_sigmffiles = fromarchive(path)
         assert len(list_of_sigmffiles) == 3
         assert isinstance(list_of_sigmffiles[0], SigMFFile)

@@ -7,35 +7,32 @@
 """Access SigMF archives without extracting them."""
 
 import os
-import shutil
 import tarfile
-import tempfile
 
-from . import __version__  #, schema, sigmf_hash, validate
 from .sigmffile import SigMFFile
-from .archive import SigMFArchive, SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT
-from .utils import dict_merge
+from .archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT
 from .error import SigMFFileError
 
 
 class SigMFArchiveReader():
-    """Access data within SigMF archive `tar` in-place without extracting.
+    """Access data within SigMF archive `tar` in-place without extracting. This
+    class can be used to iterate through multiple SigMFFiles in the archive.
 
     Parameters:
 
-      name      -- path to archive file to access. If file does not exist,
-                   or if `name` doesn't end in .sigmf, SigMFFileError is raised.
+      path    -- path to archive file to access. If file does not exist,
+                 or if `path` doesn't end in .sigmf, SigMFFileError is raised.
     """
-    def __init__(self, name=None, skip_checksum=False, map_readonly=True, archive_buffer=None):
-        self.name = name
+    def __init__(self, path=None, skip_checksum=False, map_readonly=True, archive_buffer=None):
+        self.path = path
         tar_obj = None
         try:
-            if self.name is not None:
-                if not name.endswith(SIGMF_ARCHIVE_EXT):
+            if self.path is not None:
+                if not self.path.endswith(SIGMF_ARCHIVE_EXT):
                     err = "archive extension != {}".format(SIGMF_ARCHIVE_EXT)
                     raise SigMFFileError(err)
 
-                tar_obj = tarfile.open(self.name)
+                tar_obj = tarfile.open(self.path)
 
             elif archive_buffer is not None:
                 tar_obj = tarfile.open(fileobj=archive_buffer, mode='r:')
@@ -67,7 +64,6 @@ class SigMFArchiveReader():
 
                         _, sigmffile_name = os.path.split(memb.name)
                         sigmffile_name, _ = os.path.splitext(sigmffile_name)
-                        
 
                     elif memb.name.endswith(SIGMF_DATASET_EXT):
                         data_offset_size = memb.offset_data, memb.size
@@ -79,11 +75,16 @@ class SigMFArchiveReader():
                     print('A member of type', memb.type, 'and name', memb.name, 'was found but not handled, just FYI.')
 
                 if data_offset_size is not None and json_contents is not None:
-                    sigmffile = SigMFFile(sigmffile_name, metadata=json_contents)
-                    valid_md = sigmffile.validate()
+                    sigmffile = SigMFFile(sigmffile_name,
+                                          metadata=json_contents)
+                    sigmffile.validate()
 
-                    sigmffile.set_data_file(self.name, data_buffer=archive_buffer, skip_checksum=skip_checksum, offset=data_offset_size[0],
-                                                size_bytes=data_offset_size[1], map_readonly=map_readonly)
+                    sigmffile.set_data_file(self.path,
+                                            data_buffer=archive_buffer,
+                                            skip_checksum=skip_checksum,
+                                            offset=data_offset_size[0],
+                                            size_bytes=data_offset_size[1],
+                                            map_readonly=map_readonly)
 
                     self.ndim = sigmffile.ndim
                     self.shape = sigmffile.shape
@@ -91,12 +92,12 @@ class SigMFArchiveReader():
                     data_offset_size = None
                     json_contents = None
                     sigmffile_name = None
-                    
 
             if not data_found:
                 raise SigMFFileError('No .sigmf-data file found in archive!')
         finally:
-            if tar_obj: tar_obj.close()
+            if tar_obj:
+                tar_obj.close()
 
     def __len__(self):
         return len(self.sigmffiles)
