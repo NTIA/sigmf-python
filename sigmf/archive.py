@@ -16,7 +16,7 @@ from typing import BinaryIO, Iterable, Union
 import sigmf
 
 
-from .error import SigMFFileError
+from .error import SigMFFileError, SigMFValidationError
 
 
 SIGMF_ARCHIVE_EXT = ".sigmf"
@@ -53,8 +53,13 @@ class SigMFArchive():
     def __init__(self,
                  sigmffiles: Union["sigmf.sigmffile.SigMFFile",
                                    Iterable["sigmf.sigmffile.SigMFFile"]],
+                 collectionfile: "sigmf.sigmffile.SigMFCollection" = None,
                  path: Union[str, os.PathLike] = None,
                  fileobj: BinaryIO = None):
+
+        if (not path) and (not fileobj):
+            raise SigMFFileError("'path' or 'fileobj' required for creating "
+                                 "SigMF archive!")
 
         if isinstance(sigmffiles, sigmf.sigmffile.SigMFFile):
             self.sigmffiles = [sigmffiles]
@@ -66,11 +71,16 @@ class SigMFArchive():
         else:
             raise SigMFFileError("Unknown type for sigmffiles argument!")
 
-        self.path = str(path)
+        if path:
+            self.path = str(path)
+        else:
+            self.path = None
         self.fileobj = fileobj
+        self.collectionfile = collectionfile
 
         self._check_input()
 
+        archive_name = self._get_archive_name()
         mode = "a" if fileobj is not None else "w"
         sigmf_fileobj = self._get_output_fileobj()
         try:
@@ -89,6 +99,15 @@ class SigMFArchive():
             else:
                 tarinfo.mode = 0o644  # -wr-r--r--
             return tarinfo
+
+        if collectionfile:
+            with tempfile.NamedTemporaryFile(mode="w") as tmpfile:
+                collectionfile.dump(tmpfile, pretty=True)
+                tmpfile.flush()
+                collection_filename = archive_name + SIGMF_COLLECTION_EXT
+                sigmf_archive.add(tmpfile.name,
+                                  arcname=collection_filename,
+                                  filter=chmod)
 
         for sigmffile in self.sigmffiles:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -117,6 +136,9 @@ class SigMFArchive():
             self._ensure_sigmffile_name_set(sigmffile)
             self._ensure_data_file_set(sigmffile)
             self._validate_sigmffile_metadata(sigmffile)
+        if self.collectionfile:
+            self._validate_sigmffile_collection(self.collectionfile,
+                                                self.sigmffiles)
 
     def _ensure_path_has_correct_extension(self):
         path = self.path
@@ -147,6 +169,27 @@ class SigMFArchive():
     @staticmethod
     def _validate_sigmffile_metadata(sigmffile):
         sigmffile.validate()
+
+    @staticmethod
+    def _validate_sigmffile_collection(collectionfile, sigmffiles):
+        if len(collectionfile) != len(sigmffiles):
+            raise SigMFValidationError("Mismatched number of recordings "
+                                       "between sigmffiles and collection "
+                                       "file!")
+        streams_key = collectionfile.STREAMS_KEY
+        streams = collectionfile.get_collection_field(streams_key)
+        sigmf_meta_hashes = [s["hash"] for s in streams]
+        if not streams:
+            raise SigMFValidationError("No recordings in collection file!")
+        for sigmffile in sigmffiles:
+            with tempfile.NamedTemporaryFile(mode="w") as tmpfile:
+                sigmffile.dump(tmpfile, pretty=True)
+                tmpfile.flush()
+                meta_path = tmpfile.name
+                sigmf_meta_hash = sigmf.sigmf_hash.calculate_sha512(meta_path)
+                if sigmf_meta_hash not in sigmf_meta_hashes:
+                    raise SigMFValidationError("SigMFFile given that "
+                                               "is not in collection file!")
 
     def _get_archive_name(self):
         if self.fileobj and not self.path:

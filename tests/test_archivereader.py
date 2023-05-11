@@ -1,9 +1,11 @@
+import os
 import tempfile
 
 import numpy as np
 
 from sigmf import SigMFFile, SigMFArchiveReader
-from sigmf.archive import SigMFArchive
+from sigmf.archive import SIGMF_METADATA_EXT, SigMFArchive
+from sigmf.sigmffile import SigMFCollection
 
 
 def test_access_data_without_untar(test_sigmffile):
@@ -68,3 +70,42 @@ def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
         assert len(reader) == 2
         for expected in expected_sigmffiles:
             assert expected in reader.sigmffiles
+
+
+def test_extract_single_recording_with_collection(test_sigmffile):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        meta_filepath = os.path.join(tmpdir,
+                                     test_sigmffile.name + SIGMF_METADATA_EXT)
+        with open(meta_filepath, "w") as meta_fd:
+            test_sigmffile.dump(meta_fd)
+        collection = SigMFCollection(metafiles=[meta_filepath])
+        archive_path = os.path.join(tmpdir, "test_archive.sigmf")
+        arch = SigMFArchive(test_sigmffile, collection, path=archive_path)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 1
+        actual_sigmffile = reader[0]
+        assert test_sigmffile == actual_sigmffile
+        assert collection == reader.collection
+
+
+def test_extract_multi_recording_with_collection(test_sigmffile,
+                                                 test_alternate_sigmffile):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
+        meta1_filepath = os.path.join(tmpdir, meta1_filepath)
+        with open(meta1_filepath, "w") as meta_fd:
+            test_sigmffile.dump(meta_fd)
+        meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
+        meta2_filepath = os.path.join(tmpdir, meta2_filepath)
+        with open(meta2_filepath, "w") as meta_fd:
+            test_alternate_sigmffile.dump(meta_fd)
+        collection = SigMFCollection(metafiles=[meta1_filepath,
+                                                meta2_filepath])
+        archive_path = os.path.join(tmpdir, "test_archive.sigmf")
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        arch = SigMFArchive(input_sigmffiles, collection, path=archive_path)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 2  # number of SigMFFiles
+        for actual_sigmffile in reader:
+            assert actual_sigmffile in input_sigmffiles
+        assert collection == reader.collection

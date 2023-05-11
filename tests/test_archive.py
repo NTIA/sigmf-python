@@ -1,5 +1,6 @@
 import codecs
 import json
+import os
 from pathlib import Path
 import tarfile
 import tempfile
@@ -10,7 +11,10 @@ import pytest
 import jsonschema
 
 from sigmf import error, sigmffile
-from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
+from sigmf.archive import (SIGMF_COLLECTION_EXT,
+                           SIGMF_DATASET_EXT,
+                           SIGMF_METADATA_EXT,
+                           SigMFArchive)
 
 from .testdata import TEST_FLOAT32_DATA_1, TEST_METADATA_1
 
@@ -185,7 +189,7 @@ def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
 
 def test_archive_names(test_sigmffile):
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
-        a = SigMFArchive(test_sigmffile, t.name)
+        a = SigMFArchive(sigmffiles=test_sigmffile, path=t.name)
         assert a.path == t.name
         observed_sigmffile = sigmffile.fromarchive(t.name)
         assert observed_sigmffile.name == test_sigmffile.name
@@ -200,3 +204,159 @@ def test_archive_names(test_sigmffile):
         test_sigmffile.tofile(t.name, toarchive=True)
         observed_sigmffile = sigmffile.fromarchive(t.name)
         assert observed_sigmffile.name == test_sigmffile.name
+
+
+def test_single_recording_with_collection(test_sigmffile):
+    sigmf_meta_file = test_sigmffile.name + SIGMF_METADATA_EXT
+    try:
+        with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+            test_sigmffile.dump(sigmf_meta_fd)
+        test_collection = sigmffile.SigMFCollection([sigmf_meta_file])
+        input_collection_json = test_collection.dumps(pretty=True)
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            archive = SigMFArchive(test_sigmffile,
+                                   test_collection,
+                                   fileobj=tmpfile)
+            with tarfile.open(archive.path) as tar:
+                # 1 collection_file + 1 dir + 1 meta file + 1 data file
+                assert len(tar.getmembers()) == 4
+                for member in tar.getmembers():
+                    if member.isfile():
+                        if member.name.endswith(SIGMF_COLLECTION_EXT):
+                            collection_file = tar.extractfile(member)
+                            output_collection_json = json.load(collection_file)
+                            assert (json.loads(input_collection_json) ==
+                                    output_collection_json)
+    finally:
+        if os.path.exists(sigmf_meta_file):
+            os.remove(sigmf_meta_file)
+
+
+def test_multiple_recordings_with_collection(test_sigmffile,
+                                             test_alternate_sigmffile,
+                                             test_alternate_sigmffile_2):
+    sigmf_meta_files = [
+        test_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+    ]
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    try:
+        for sigmf_meta_file, sigmf_file in zip(sigmf_meta_files,
+                                               input_sigmf_files):
+            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+                sigmf_file.dump(sigmf_meta_fd)
+        test_collection = sigmffile.SigMFCollection(sigmf_meta_files)
+        input_collection_json = test_collection.dumps(pretty=True)
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            archive = SigMFArchive(input_sigmf_files,
+                                   test_collection,
+                                   fileobj=tmpfile)
+            with tarfile.open(archive.path) as tar:
+                # 1 collection_file + 3 dir + 3 meta file + 3 data file
+                assert len(tar.getmembers()) == 10
+                for member in tar.getmembers():
+                    if member.isfile():
+                        if member.name.endswith(SIGMF_COLLECTION_EXT):
+                            collection_file = tar.extractfile(member)
+                            output_collection_json = json.load(collection_file)
+                            assert (json.loads(input_collection_json) ==
+                                    output_collection_json)
+    finally:
+        for sigmf_meta_file in sigmf_meta_files:
+            if os.path.exists(sigmf_meta_file):
+                os.remove(sigmf_meta_file)
+
+
+def test_extra_sigmf_file_not_in_collection(test_sigmffile,
+                                            test_alternate_sigmffile,
+                                            test_alternate_sigmffile_2):
+    sigmf_meta_files = [
+        test_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+    ]
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    try:
+        for sigmf_meta_file, sigmf_file in zip(sigmf_meta_files,
+                                               input_sigmf_files):
+            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+                sigmf_file.dump(sigmf_meta_fd)
+        test_collection = sigmffile.SigMFCollection(sigmf_meta_files[:2])
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            with pytest.raises(error.SigMFValidationError):
+                SigMFArchive(input_sigmf_files,
+                             test_collection,
+                             fileobj=tmpfile)
+    finally:
+        for sigmf_meta_file in sigmf_meta_files:
+            if os.path.exists(sigmf_meta_file):
+                os.remove(sigmf_meta_file)
+
+
+def test_extra_recording_not_in_sigmffiles(test_sigmffile,
+                                           test_alternate_sigmffile,
+                                           test_alternate_sigmffile_2):
+    sigmf_meta_files = [
+        test_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+    ]
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    try:
+        for sigmf_meta_file, sigmf_file in zip(sigmf_meta_files,
+                                               input_sigmf_files):
+            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+                sigmf_file.dump(sigmf_meta_fd)
+        test_collection = sigmffile.SigMFCollection(sigmf_meta_files)
+
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            with pytest.raises(error.SigMFValidationError):
+                SigMFArchive(input_sigmf_files[:2],
+                             test_collection,
+                             fileobj=tmpfile)
+    finally:
+        for sigmf_meta_file in sigmf_meta_files:
+            if os.path.exists(sigmf_meta_file):
+                os.remove(sigmf_meta_file)
+
+
+def test_mismatched_sigmffiles_collection(test_sigmffile,
+                                          test_alternate_sigmffile,
+                                          test_alternate_sigmffile_2):
+    sigmf_meta_files = [
+        test_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+    ]
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    try:
+        for sigmf_meta_file, sigmf_file in zip(sigmf_meta_files,
+                                               input_sigmf_files):
+            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+                sigmf_file.dump(sigmf_meta_fd)
+        test_collection = sigmffile.SigMFCollection(sigmf_meta_files[:2])
+
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            with pytest.raises(error.SigMFValidationError):
+                SigMFArchive(input_sigmf_files[1:3],
+                             test_collection,
+                             fileobj=tmpfile)
+    finally:
+        for sigmf_meta_file in sigmf_meta_files:
+            if os.path.exists(sigmf_meta_file):
+                os.remove(sigmf_meta_file)
+
+
+def test_archive_no_path_or_fileobj(test_sigmffile):
+    """Error should be raised when no path or fileobj given."""
+    with pytest.raises(error.SigMFFileError):
+        SigMFArchive(test_sigmffile)

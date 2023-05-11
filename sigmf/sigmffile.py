@@ -549,7 +549,7 @@ class SigMFFile(SigMFMetafile):
         if file_path is None:
             file_path = self.name
 
-        archive = SigMFArchive(self, file_path, fileobj)
+        archive = SigMFArchive(self, path=file_path, fileobj=fileobj)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -634,7 +634,10 @@ class SigMFFile(SigMFMetafile):
 
         if not self._is_conforming_dataset():
             warnings.warn(f'Recording dataset appears non-compliant, resulting data may be erroneous')
-        return self._read_datafile(first_byte, count * self.get_num_channels(), autoscale, False)
+        return self._read_datafile(first_byte,
+                                   count * self.get_num_channels(),
+                                   autoscale,
+                                   raw_components)
 
     def _read_datafile(self, first_byte, nitems, autoscale, raw_components):
         '''
@@ -709,8 +712,10 @@ class SigMFCollection(SigMFMetafile):
             self._metadata = {self.COLLECTION_KEY:{}}
             self._metadata[self.COLLECTION_KEY][self.VERSION_KEY] = __version__
             self._metadata[self.COLLECTION_KEY][self.STREAMS_KEY] = []
-        else:
+        elif isinstance(metadata, dict):
             self._metadata = metadata
+        else:
+            self._metadata = json.loads(metadata)
 
         if metafiles is None:
             self.metafiles = []
@@ -725,6 +730,15 @@ class SigMFCollection(SigMFMetafile):
         the length of a collection is the number of streams
         '''
         return len(self.get_stream_names())
+
+    def __eq__(self, other):
+        """Define equality between two `SigMFCollections's by comparing
+        metadata.
+        """
+        if isinstance(other, SigMFCollection):
+            return self._metadata == other._metadata
+
+        return False
 
     def verify_stream_hashes(self):
         '''
@@ -789,9 +803,24 @@ class SigMFCollection(SigMFMetafile):
         """
         return self._metadata[self.COLLECTION_KEY].get(key, default)
 
-    def tofile(self, file_path, pretty=True):
+    def archive(self, file_path=None, fileobj=None):
+        """Dump contents to SigMF archive format.
+
+        `file_path` is passed to SigMFArchive `path` and `fileobj` is passed to
+        SigMFArchive `fileobj`.
+
+        """
+
+        sigmffiles = []
+        for name in self.get_stream_names():
+            sigmffile = self.get_SigMFFile(name)
+            sigmffiles.append(sigmffile)
+        archive = SigMFArchive(sigmffiles, self, file_path, fileobj)
+        return archive.path
+
+    def tofile(self, file_path, pretty=True, toarchive=False):
         '''
-        Write metadata file
+        Write metadata file or create archive.
 
         Parameters
         ----------
@@ -799,11 +828,17 @@ class SigMFCollection(SigMFMetafile):
             Location to save.
         pretty : bool, default True
             When True will write more human-readable output, otherwise will be flat JSON.
+        toarchive : bool, default False
+            If True, create an archive from the collection file and recordings
+            instead of creating collection metadata file.
         '''
         fns = get_sigmf_filenames(file_path)
-        with open(fns['collection_fn'], 'w') as fp:
-            self.dump(fp, pretty=pretty)
-            fp.write('\n')  # text files should end in carriage return
+        if toarchive:
+            self.archive(fns['archive_fn'])
+        else:
+            with open(fns['collection_fn'], 'w') as fp:
+                self.dump(fp, pretty=pretty)
+                fp.write('\n')  # text files should end in carriage return
 
     def get_SigMFFile(self, stream_name=None, stream_index=None):
         '''

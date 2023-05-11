@@ -9,8 +9,11 @@
 import os
 import tarfile
 
-from .sigmffile import SigMFFile
-from .archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT
+from .sigmffile import SigMFCollection, SigMFFile
+from .archive import (SIGMF_COLLECTION_EXT,
+                      SIGMF_DATASET_EXT,
+                      SIGMF_METADATA_EXT,
+                      SIGMF_ARCHIVE_EXT)
 from .error import SigMFFileError
 
 
@@ -45,6 +48,7 @@ class SigMFArchiveReader():
             sigmffile_name = None
             self.sigmffiles = []
             data_found = False
+            collection_metadata = {}
 
             for memb in tar_obj.getmembers():
                 if memb.isdir():  # memb.type == tarfile.DIRTYPE:
@@ -64,11 +68,12 @@ class SigMFArchiveReader():
 
                         _, sigmffile_name = os.path.split(memb.name)
                         sigmffile_name, _ = os.path.splitext(sigmffile_name)
-
                     elif memb.name.endswith(SIGMF_DATASET_EXT):
                         data_offset_size = memb.offset_data, memb.size
                         data_found = True
-
+                    elif memb.name.endswith(SIGMF_COLLECTION_EXT):
+                        with tar_obj.extractfile(memb) as collection_f:
+                            collection_metadata = collection_f.read()
                     else:
                         print('A regular file', memb.name, 'was found but ignored in the archive')
                 else:
@@ -92,6 +97,16 @@ class SigMFArchiveReader():
                     data_offset_size = None
                     json_contents = None
                     sigmffile_name = None
+            if collection_metadata:
+                # Currently the SigMFCollection class does not support getting
+                # SigMFFiles (SigMFCollection.get_SigMFFile()) when created
+                # here in SigMFArchiveReader. This is because the SigMF
+                # metadata files are not extracted from the tarfile to the
+                # file system.
+                self.collection = SigMFCollection(metadata=collection_metadata,
+                                                  skip_checksums=True)
+            else:
+                self.collection = None
 
             if not data_found:
                 raise SigMFFileError('No .sigmf-data file found in archive!')
