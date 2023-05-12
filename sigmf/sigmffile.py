@@ -78,6 +78,7 @@ class SigMFMetafile():
             indent=4 if pretty else None,
             separators=(',', ': ') if pretty else None,
         )
+        filep.write("\n")
 
     def dumps(self, pretty=True):
         '''
@@ -574,7 +575,6 @@ class SigMFFile(SigMFMetafile):
         else:
             with open(fns['meta_fn'], 'w') as fp:
                 self.dump(fp, pretty=pretty)
-                fp.write('\n')  # text files should end in carriage return
 
     def read_samples_in_capture(self, index=0, autoscale=True):
         '''
@@ -838,7 +838,6 @@ class SigMFCollection(SigMFMetafile):
         else:
             with open(fns['collection_fn'], 'w') as fp:
                 self.dump(fp, pretty=pretty)
-                fp.write('\n')  # text files should end in carriage return
 
     def get_SigMFFile(self, stream_name=None, stream_index=None):
         '''
@@ -958,17 +957,23 @@ def get_dataset_filename_from_metadata(meta_fn, metadata=None):
 
 
 def fromarchive(archive_path, dir=None):
-    """Extract an archive and return containing SigMFFiles.
+    """Extract an archive and return containing SigMFFiles and SigMFCollection.
 
     The `dir` parameter is no longer used as this function has been changed to
     access SigMF archives without extracting them.
     """
     from .archivereader import SigMFArchiveReader
-    sigmffiles = SigMFArchiveReader(archive_path).sigmffiles
+    reader = SigMFArchiveReader(archive_path)
+    sigmffiles = reader.sigmffiles
+    sigmffile_ret = None
     if len(sigmffiles) == 1:
-        return sigmffiles[0]
+        sigmffile_ret = sigmffiles[0]
     else:
-        return sigmffiles
+        sigmffile_ret = sigmffiles
+    if reader.collection:
+        return sigmffile_ret, reader.collection
+    else:
+        return sigmffile_ret
 
 
 def fromfile(filename, skip_checksum=False):
