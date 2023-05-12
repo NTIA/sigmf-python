@@ -53,7 +53,7 @@ class SigMFArchive():
     def __init__(self,
                  sigmffiles: Union["sigmf.sigmffile.SigMFFile",
                                    Iterable["sigmf.sigmffile.SigMFFile"]],
-                 collectionfile: "sigmf.sigmffile.SigMFCollection" = None,
+                 collection: "sigmf.sigmffile.SigMFCollection" = None,
                  path: Union[str, os.PathLike] = None,
                  fileobj: BinaryIO = None):
 
@@ -76,7 +76,7 @@ class SigMFArchive():
         else:
             self.path = None
         self.fileobj = fileobj
-        self.collectionfile = collectionfile
+        self.collection = collection
 
         self._check_input()
 
@@ -100,9 +100,9 @@ class SigMFArchive():
                 tarinfo.mode = 0o644  # -wr-r--r--
             return tarinfo
 
-        if collectionfile:
+        if collection:
             with tempfile.NamedTemporaryFile(mode="w") as tmpfile:
-                collectionfile.dump(tmpfile, pretty=True)
+                collection.dump(tmpfile, pretty=True)
                 tmpfile.flush()
                 collection_filename = archive_name + SIGMF_COLLECTION_EXT
                 sigmf_archive.add(tmpfile.name,
@@ -136,8 +136,8 @@ class SigMFArchive():
             self._ensure_sigmffile_name_set(sigmffile)
             self._ensure_data_file_set(sigmffile)
             self._validate_sigmffile_metadata(sigmffile)
-        if self.collectionfile:
-            self._validate_sigmffile_collection(self.collectionfile,
+        if self.collection:
+            self._validate_sigmffile_collection(self.collection,
                                                 self.sigmffiles)
 
     def _ensure_path_has_correct_extension(self):
