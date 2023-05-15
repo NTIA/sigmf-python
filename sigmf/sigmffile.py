@@ -161,6 +161,13 @@ class SigMFFile(SigMFMetafile):
 
         Parameters
         ----------
+        name: Name used for directory and filenames if archived.
+                     For example, given `name=archive1`, then passing this
+                     sigmffile to SigMFArchive will add the following files
+                     to the archive:
+                        - archive1/
+                          - archive1.sigmf-meta
+                          - archive1.sigmf-data
         metadata: str or dict, optional
             Metadata for associated dataset.
         data_file: str, optional
@@ -171,13 +178,6 @@ class SigMFFile(SigMFMetafile):
             When True will skip calculating hash on data_file (if present) to check against metadata.
         map_readonly: bool, default True
             Indicates whether assignments on the numpy.memmap are allowed.
-        name: Name used for directory and filenames if archived.
-                     For example, given `name=archive1`, then passing this
-                     sigmffile to SigMFArchive will add the following files
-                     to the archive:
-                        - archive1/
-                          - archive1.sigmf-meta
-                          - archive1.sigmf-data
         '''
         super(SigMFFile, self).__init__()
         self.data_file = None
