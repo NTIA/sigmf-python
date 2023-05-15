@@ -328,39 +328,6 @@ def test_archive_collection(test_sigmffile,
             for input_sigmf_file in input_sigmf_files:
                 assert input_sigmf_file in archive_reader.sigmffiles
             assert test_collection == archive_reader.collection
-    finally:
-        for sigmf_meta_file in sigmf_meta_files:
-            if os.path.exists(sigmf_meta_file):
-                os.remove(sigmf_meta_file)
-        for sigmf_file in input_sigmf_files:
-            filename = sigmf_file.name + SIGMF_DATASET_EXT
-            if os.path.exists(filename):
-                os.remove(filename)
-
-
-def test_tofile_collection(test_sigmffile,
-                           test_alternate_sigmffile,
-                           test_alternate_sigmffile_2):
-    sigmf_meta_files = [
-        test_sigmffile.name + SIGMF_METADATA_EXT,
-        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
-        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
-    ]
-    input_sigmf_files = [test_sigmffile,
-                         test_alternate_sigmffile,
-                         test_alternate_sigmffile_2]
-    data = [TEST_FLOAT32_DATA_1, TEST_FLOAT32_DATA_2, TEST_FLOAT32_DATA_3]
-    try:
-        for sigmf_meta_file, sigmf_file, _data in zip(sigmf_meta_files,
-                                                      input_sigmf_files,
-                                                      data):
-            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
-                sigmf_file.dump(sigmf_meta_fd)
-            sample_data = sigmf_file.read_samples(autoscale=False,
-                                                  raw_components=True)
-            assert np.array_equal(sample_data, _data)
-            sample_data.tofile(sigmf_file.name + SIGMF_DATASET_EXT)
-        test_collection = sigmffile.SigMFCollection(sigmf_meta_files)
         with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
             test_collection.tofile(tmpfile.name, toarchive=True)
             archive_reader = SigMFArchiveReader(path=tmpfile.name)
