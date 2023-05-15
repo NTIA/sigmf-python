@@ -91,8 +91,6 @@ class SigMFArchiveReader():
                                             size_bytes=data_offset_size[1],
                                             map_readonly=map_readonly)
 
-                    self.ndim = sigmffile.ndim
-                    self.shape = sigmffile.shape
                     self.sigmffiles.append(sigmffile)
                     data_offset_size = None
                     json_contents = None

@@ -26,7 +26,8 @@ SIGMF_COLLECTION_EXT = ".sigmf-collection"
 
 
 class SigMFArchive():
-    """Archive one or more `SigMFFile`s.
+    """Archive one or more `SigMFFile`s. A collection file can
+    optionally be included.
 
     A `.sigmf` file must include both valid metadata and data.
     If `self.data_file` is not set or the requested output file
@@ -34,17 +35,19 @@ class SigMFArchive():
 
     Parameters:
 
-      sigmffile -- An iterable of SigMFFile objects with valid metadata and
-                    data_files
+      sigmffiles -- A single SigMFFIle or an iterable of SigMFFile objects with
+                    valid metadata and data_files
 
-      path      -- path to archive file to create. If file exists, overwrite.
+      collection -- An optional SigMFCollection.
+
+      path       -- Path to archive file to create. If file exists, overwrite.
                     If `path` doesn't end in .sigmf, it will be appended. The
                     `self.path` instance variable will be updated upon
                     successful writing of the archive to point to the final
                     archive path.
 
 
-      fileobj   -- If `fileobj` is specified, it is used as an alternative to
+      fileobj    -- If `fileobj` is specified, it is used as an alternative to
                     a file object opened in binary mode for `path`. If
                     `fileobj` is an open tarfile, it will be appended to. It is
                     supposed to be at position 0. `fileobj` won't be closed. If
