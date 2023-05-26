@@ -182,6 +182,16 @@ cf32_sigmffile = collection.get_SigMFFile(stream_name='example_cf32')
 
 ### Create and Read SigMF Archives with Multiple Recordings
 
+The below example shows different ways to create and read an archive. The
+`SigMFArchive` class, the `SigMFFile.archive()` method, and the
+`SigMFFile.tofile()` method can all be used to create an archive. Archives
+with collections can be created using `SigMFArchive` class, 
+`SigMFCollection.archive()` method, and the `SigMFCollection.tofile()` method.
+
+There are also different ways to read an archive using `SigMFArchiveReader`
+class, the `sigmffile.fromarchive()` method, and the `sigmffile.fromfile()`
+method.
+
 ```python
 import numpy as np
 from sigmf.archivereader import SigMFArchiveReader
