@@ -35,7 +35,7 @@ class SigMFArchive():
 
     Parameters:
 
-      sigmffiles -- A single SigMFFIle or an iterable of SigMFFile objects with
+      sigmffiles -- A single SigMFFile or an iterable of SigMFFile objects with
                     valid metadata and data_files
 
       collection -- An optional SigMFCollection.
