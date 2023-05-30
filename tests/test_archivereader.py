@@ -73,35 +73,37 @@ def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
 
 
 def test_extract_single_recording_with_collection(test_sigmffile):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        meta_filepath = os.path.join(tmpdir,
-                                     test_sigmffile.name + SIGMF_METADATA_EXT)
+    try:
+        meta_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
         with open(meta_filepath, "w") as meta_fd:
             test_sigmffile.dump(meta_fd)
         collection = SigMFCollection(metafiles=[meta_filepath])
-        archive_path = os.path.join(tmpdir, "test_archive.sigmf")
+        archive_path = "test_archive.sigmf"
         arch = SigMFArchive(test_sigmffile, collection, path=archive_path)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 1
         actual_sigmffile = reader[0]
         assert test_sigmffile == actual_sigmffile
         assert collection == reader.collection
+    finally:
+        if os.path.exists(meta_filepath):
+            os.remove(meta_filepath)
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
 
 
 def test_extract_multi_recording_with_collection(test_sigmffile,
                                                  test_alternate_sigmffile):
-    with tempfile.TemporaryDirectory() as tmpdir:
+    try:
         meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
-        meta1_filepath = os.path.join(tmpdir, meta1_filepath)
         with open(meta1_filepath, "w") as meta_fd:
             test_sigmffile.dump(meta_fd)
         meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
-        meta2_filepath = os.path.join(tmpdir, meta2_filepath)
         with open(meta2_filepath, "w") as meta_fd:
             test_alternate_sigmffile.dump(meta_fd)
         collection = SigMFCollection(metafiles=[meta1_filepath,
                                                 meta2_filepath])
-        archive_path = os.path.join(tmpdir, "test_archive.sigmf")
+        archive_path = "test_archive.sigmf"
         input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
         arch = SigMFArchive(input_sigmffiles, collection, path=archive_path)
         reader = SigMFArchiveReader(arch.path)
@@ -109,3 +111,10 @@ def test_extract_multi_recording_with_collection(test_sigmffile,
         for actual_sigmffile in reader:
             assert actual_sigmffile in input_sigmffiles
         assert collection == reader.collection
+    finally:
+        if os.path.exists(meta1_filepath):
+            os.remove(meta1_filepath)
+        if os.path.exists(meta2_filepath):
+            os.remove(meta2_filepath)
+        if os.path.exists(archive_path):
+            os.remove(archive_path)

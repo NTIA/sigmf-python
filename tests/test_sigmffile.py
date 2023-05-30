@@ -27,7 +27,7 @@ import unittest
 
 from sigmf import sigmffile, utils
 from sigmf.archivereader import SigMFArchiveReader
-from sigmf.sigmffile import SigMFFile, fromarchive
+from sigmf.sigmffile import SigMFCollection, SigMFFile, fromarchive
 from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
 
 from .testdata import *
@@ -334,6 +334,8 @@ def test_archive_collection(test_sigmffile,
             for input_sigmf_file in input_sigmf_files:
                 assert input_sigmf_file in archive_reader.sigmffiles
             assert test_collection == archive_reader.collection
+            for input_sigmf_file in input_sigmf_files:
+                assert input_sigmf_file in test_collection.sigmffiles
     finally:
         for sigmf_meta_file in sigmf_meta_files:
             if os.path.exists(sigmf_meta_file):
@@ -342,3 +344,48 @@ def test_archive_collection(test_sigmffile,
             filename = sigmf_file.name + SIGMF_DATASET_EXT
             if os.path.exists(filename):
                 os.remove(filename)
+
+
+def test_create_collection_with_sigmffiles(test_sigmffile,
+                                           test_alternate_sigmffile,
+                                           test_alternate_sigmffile_2):
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    collection = SigMFCollection(metafiles=input_sigmf_files)
+    output_stream_names = collection.get_stream_names()
+    output_sigmf_files_by_name = []
+    for stream_name in output_stream_names:
+        output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
+        output_sigmf_files_by_name.append(output_sigmf_file)
+    output_sigmf_files_by_index = []
+    for i in range(len(collection)):
+        output_sigmf_file = collection.get_SigMFFile(stream_index=i)
+        output_sigmf_files_by_index.append(output_sigmf_file)
+    for input_sigmf in input_sigmf_files:
+        assert input_sigmf.name in output_stream_names
+        assert input_sigmf in output_sigmf_files_by_name
+        assert input_sigmf in output_sigmf_files_by_index
+
+
+def test_collection_set_sigmffiles(test_sigmffile,
+                                   test_alternate_sigmffile,
+                                   test_alternate_sigmffile_2):
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    collection = SigMFCollection(metafiles=[test_sigmffile])
+    collection.set_streams(input_sigmf_files)
+    output_stream_names = collection.get_stream_names()
+    output_sigmf_files_by_name = []
+    for stream_name in output_stream_names:
+        output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
+        output_sigmf_files_by_name.append(output_sigmf_file)
+    output_sigmf_files_by_index = []
+    for i in range(len(collection)):
+        output_sigmf_file = collection.get_SigMFFile(stream_index=i)
+        output_sigmf_files_by_index.append(output_sigmf_file)
+    for input_sigmf in input_sigmf_files:
+        assert input_sigmf.name in output_stream_names
+        assert input_sigmf in output_sigmf_files_by_name
+        assert input_sigmf in output_sigmf_files_by_index

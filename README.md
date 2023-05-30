@@ -276,6 +276,7 @@ print(len(sigmffiles))  # equal to 2 for 2 sigmffiles
 reader = SigMFArchiveReader("multi_recording_archive2.sigmf")
 print(len(reader))  # equal to 2 for 2 sigmffiles
 print(reader.collection)
+print(len(reader.collection.sigmffiles)) # get SigMFFiles from collection
 
 # read multirecording archives using fromarchive with collection
 sigmffiles, collection = fromarchive("multi_recording_archive2.sigmf")

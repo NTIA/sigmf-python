@@ -8,6 +8,7 @@
 
 from collections import OrderedDict
 import codecs
+from io import BytesIO
 import json
 import tarfile
 import tempfile
@@ -98,7 +99,7 @@ class SigMFMetafile():
             self.ordered_metadata(),
             indent=4 if pretty else None,
             separators=(',', ': ') if pretty else None,
-        )
+        ) + "\n"
 
 class SigMFFile(SigMFMetafile):
     START_INDEX_KEY = "core:sample_start"
@@ -697,9 +698,10 @@ class SigMFCollection(SigMFMetafile):
 
         Parameters:
 
-        metafiles -- A list of SigMF metadata filenames objects comprising the Collection,
-                    there must be at least one file. If the files do not exist, this will
-                    raise a SigMFFileError.
+        metafiles -- A list of SigMF metadata filenames objects or SigMFFile
+                    objects comprising the Collection, there must be at least
+                    one file. If the files do not exist, this will raise a
+                    SigMFFileError.
 
         metadata  -- collection metadata to use, if not provided this will populate a
                     minimal set of default metadata. The core:streams field will be
@@ -751,23 +753,58 @@ class SigMFCollection(SigMFMetafile):
             if path.isfile(metafile_name):
                 new_hash = sigmf_hash.calculate_sha512(filename=metafile_name)
                 if old_hash != new_hash:
-                    raise SigMFFileError(f'Calculated file hash for {metafile_name} does not match collection metadata.')
+                    raise SigMFFileError('Calculated file hash for metadata '
+                                         f'file {metafile_name} does not '
+                                         'match collection metadata.')
+            sigmffile = [x for x in self.sigmffiles
+                         if x.name == stream.get('name')][0]
+            sigmffile_meta = sigmffile.dumps()
+            sigmffile_bytes = sigmffile_meta.encode('utf-8')
+            size_of_meta = len(sigmffile_bytes)
+            sigmffile_hash = sigmf_hash.calculate_sha512(
+                fileobj=BytesIO(sigmffile_bytes),
+                offset_and_size=(0, size_of_meta)
+            )
+            if old_hash != sigmffile_hash:
+                raise SigMFFileError('Calculated file hash for SigMFFile '
+                                     f'{sigmffile.name} does not match '
+                                     'collection metadata.')
 
     def set_streams(self, metafiles):
         '''
         configures the collection `core:streams` field from the specified list of metafiles
         '''
-        self.metafiles = metafiles
         streams = []
-        for metafile in self.metafiles:
-            if metafile.endswith('.sigmf-meta') and path.isfile(metafile):
-                stream = {
-                    "name": get_sigmf_filenames(metafile)['base_fn'],
-                    "hash": sigmf_hash.calculate_sha512(filename=metafile)
-                }
-                streams.append(stream)
-            else:
-                raise SigMFFileError(f'Specifed stream file {metafile} is not a valid SigMF Metadata file')
+        sigmffile_names = []
+        self.sigmffiles = []
+        if isinstance(metafiles[0], SigMFFile):
+            for sigmffile in metafiles:
+                sigmffile_names.append(sigmffile.name + SIGMF_METADATA_EXT)
+                sigmffile_meta = sigmffile.dumps()
+                sigmffile_bytes = sigmffile_meta.encode('utf-8')
+                size_of_meta = len(sigmffile_bytes)
+                streams.append({
+                    "name": sigmffile.name,
+                    "hash": sigmf_hash.calculate_sha512(
+                                fileobj=BytesIO(sigmffile_bytes),
+                                offset_and_size=(0, size_of_meta))
+                })
+                self.sigmffiles.append(sigmffile)
+            self.metafiles = sigmffile_names
+        else:
+            self.metafiles = metafiles
+            for metafile in self.metafiles:
+                if (metafile.endswith(SIGMF_METADATA_EXT) and
+                   path.isfile(metafile)):
+                    stream = {
+                        "name": get_sigmf_filenames(metafile)['base_fn'],
+                        "hash": sigmf_hash.calculate_sha512(filename=metafile)
+                    }
+                    streams.append(stream)
+                else:
+                    raise SigMFFileError(f'Specifed stream file {metafile} is'
+                                         ' not a valid SigMF Metadata file')
+                self.sigmffiles.append(fromfile(metafile, skip_checksum=self.skip_checksums))
         self.set_collection_field(self.STREAMS_KEY, streams)
 
     def get_stream_names(self):
@@ -843,15 +880,14 @@ class SigMFCollection(SigMFMetafile):
         '''
         Returns the SigMFFile instance of the specified stream if it exists
         '''
-        metafile = None
+        sigmffile = None
         if stream_name is not None:
-            if stream_name in self.get_stream_names():
-                metafile = stream_name + '.sigmf_meta'
+            sigmffile = [x for x in self.sigmffiles
+                         if x.name == stream_name][0]
         if stream_index is not None and stream_index < self.__len__():
-            metafile = self.get_stream_names()[stream_index] + '.sigmf_meta'
+            sigmffile = self.sigmffiles[stream_index]
+        return sigmffile
 
-        if metafile is not None:
-            return fromfile(metafile, skip_checksum=self.skip_checksums)
 
 def dtype_info(datatype):
     """

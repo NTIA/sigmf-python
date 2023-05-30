@@ -96,13 +96,8 @@ class SigMFArchiveReader():
                     json_contents = None
                     sigmffile_name = None
             if collection_metadata:
-                # Currently the SigMFCollection class does not support getting
-                # SigMFFiles (SigMFCollection.get_SigMFFile()) when created
-                # here in SigMFArchiveReader. This is because the SigMF
-                # metadata files are not extracted from the tarfile to the
-                # file system.
-                self.collection = SigMFCollection(metadata=collection_metadata,
-                                                  skip_checksums=True)
+                self.collection = SigMFCollection(metafiles=self.sigmffiles,
+                                                  metadata=collection_metadata)
             else:
                 self.collection = None
 
