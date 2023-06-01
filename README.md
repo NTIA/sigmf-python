@@ -47,6 +47,32 @@ handle.get_captures() # returns list of 'captures' dictionaries
 handle.get_annotations() # returns list of all annotations
 ```
 
+### Load a SigMF archive with multiple recordings
+There are different ways to read an archive using `SigMFArchiveReader`
+class, the `sigmffile.fromarchive()` method, and the `sigmffile.fromfile()`
+method.
+
+```python
+import numpy as np
+from sigmf.archivereader import SigMFArchiveReader
+
+from sigmf.sigmffile import (fromarchive,
+                             fromfile)
+# read multirecording archives using fromarchive
+sigmffiles = fromarchive("multi_recording_archive1.sigmf")
+print(len(sigmffiles))  
+
+# read multirecording archives using fromfile
+sigmffiles = fromfile("multi_recording_archive1.sigmf")
+print(len(sigmffiles)) 
+
+# read multirecording archives using archive reader with collection
+reader = SigMFArchiveReader("multi_recording_archive2.sigmf")
+print(len(reader))  
+print(reader.collection)
+print(len(reader.collection.sigmffiles)) # get SigMFFiles from collection
+```
+
 ### Verify SigMF dataset integrity & compliance
 
 ```bash
@@ -180,27 +206,15 @@ ci16_sigmffile = collection.get_SigMFFile(stream_name='example_ci16')
 cf32_sigmffile = collection.get_SigMFFile(stream_name='example_cf32')
 ```
 
-### Create and Read SigMF Archives with Multiple Recordings
-
-The below example shows different ways to create and read an archive. The
-`SigMFArchive` class, the `SigMFFile.archive()` method, and the
-`SigMFFile.tofile()` method can all be used to create an archive. Archives
-with collections can be created using `SigMFArchive` class, 
-`SigMFCollection.archive()` method, and the `SigMFCollection.tofile()` method.
-
-There are also different ways to read an archive using `SigMFArchiveReader`
-class, the `sigmffile.fromarchive()` method, and the `sigmffile.fromfile()`
-method.
+### Create a SigMF Archive
+The `SigMFArchive` class, the `SigMFFile.archive()` method, and the
+`SigMFFile.tofile()` method can all be used to create an archive. 
 
 ```python
 import numpy as np
-from sigmf.archivereader import SigMFArchiveReader
 
 from sigmf.sigmffile import (SigMFFile,
-                             SigMFArchive,
-                             SigMFCollection,
-                             fromarchive,
-                             fromfile)
+                             SigMFArchive)
 
 
 # create data file
@@ -225,68 +239,58 @@ archive1_path = sigmf_file_1.archive(file_path="single_recording_archive2.sigmf"
 # create archive using tofile
 sigmf_file_1.tofile(file_path="single_recording_archive3.sigmf",
                     toarchive=True)
+```
 
-# multiple recordings
+### Create SigMF Archives with Multiple Recordings
+Archives with collections can be created using `SigMFArchive` class, 
+`SigMFCollection.archive()` method, and the `SigMFCollection.tofile()` method.
+
+```python
+import numpy as np
+
+from sigmf.sigmffile import (SigMFFile,
+                             SigMFArchive,
+                             SigMFCollection)
+
+
+# create data files
+random_data1 = np.random.rand(128)
+data1_path = "recording1.sigmf-data"
+random_data1.tofile(data1_path)
+
 random_data2 = np.random.rand(128)
 data2_path = "recording2.sigmf-data"
 random_data2.tofile(data2_path)
 
 # create metadata
+sigmf_file_1 = SigMFFile(name='recording1')
+sigmf_file_1.set_global_field("core:datatype", "rf32_le")
+sigmf_file_1.add_annotation(start_index=0, length=len(random_data1))
+sigmf_file_1.add_capture(start_index=0)
+sigmf_file_1.set_data_file(data1_path)
+
 sigmf_file_2 = SigMFFile(name='recording2')
 sigmf_file_2.set_global_field("core:datatype", "rf32_le")
 sigmf_file_2.add_annotation(start_index=0, length=len(random_data2))
 sigmf_file_2.add_capture(start_index=0)
 sigmf_file_2.set_data_file(data2_path)
 
-# create archive using SigMFArchive
-sigmffiles = [sigmf_file_1, sigmf_file_2]
-archive2 = SigMFArchive(sigmffiles=sigmffiles,
-                        path="multi_recording_archive1.sigmf")
-
-# create archive with collection
+# create collection
 sigmf_file_1.tofile("recording1.sigmf-meta")
 sigmf_file_2.tofile("recording2.sigmf-meta")
 metafiles = ["recording1.sigmf-meta", "recording2.sigmf-meta"]
 collection = SigMFCollection(metafiles=metafiles)
 
-# create archive using SigMFArchive
+# create archive using SigMFArchive without collection
+sigmffiles = [sigmf_file_1, sigmf_file_2]
 archive3 = SigMFArchive(sigmffiles=sigmffiles,
-                        collection=collection,
-                        path="multi_recording_archive2.sigmf")
+                        path="multi_recording_archive1.sigmf")
 
 # create archive using collection archive
-archive3_path = collection.archive(file_path="multi_recording_archive3.sigmf")
+archive3_path = collection.archive(file_path="multi_recording_archive2.sigmf")
 
 # create archive using collection tofile
-collection.tofile(file_path="multi_recording_archive4.sigmf", toarchive=True)
-
-# read multirecording archives using archive reader
-reader = SigMFArchiveReader("multi_recording_archive1.sigmf")
-print(len(reader))  # equal to 2 for 2 sigmffiles
-
-# read multirecording archives using fromarchive
-sigmffiles = fromarchive("multi_recording_archive1.sigmf")
-print(len(sigmffiles))  # equal to 2 for 2 sigmffiles
-
-# read multirecording archives using fromfile
-sigmffiles = fromfile("multi_recording_archive1.sigmf")
-print(len(sigmffiles))  # equal to 2 for 2 sigmffiles
-
-# read multirecording archives using archive reader with collection
-reader = SigMFArchiveReader("multi_recording_archive2.sigmf")
-print(len(reader))  # equal to 2 for 2 sigmffiles
-print(reader.collection)
-print(len(reader.collection.sigmffiles)) # get SigMFFiles from collection
-
-# read multirecording archives using fromarchive with collection
-sigmffiles, collection = fromarchive("multi_recording_archive2.sigmf")
-print(len(sigmffiles))  # equal to 2 for 2 sigmffiles
-print(collection)
-
-# read multirecording archives using fromfile with collection
-sigmffiles, collection = fromfile("multi_recording_archive2.sigmf")
-print(len(sigmffiles))  # equal to 2 for 2 sigmffiles
-print(collection)
+collection.tofile(file_path="multi_recording_archive3.sigmf", toarchive=True)
 ```
 
 ### Load a SigMF Archive and slice its data without untaring it
