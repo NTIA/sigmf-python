@@ -52,13 +52,17 @@ class SigMFArchive():
                     `fileobj` is an open tarfile, it will be appended to. It is
                     supposed to be at position 0. `fileobj` won't be closed. If
                     `fileobj` is given, `path` has no effect.
+
+      pretty     -- If True, pretty print JSON when creating the metadata and
+                    collection files in the archive. Defaults to True.
     """
     def __init__(self,
                  sigmffiles: Union["sigmf.sigmffile.SigMFFile",
                                    Iterable["sigmf.sigmffile.SigMFFile"]],
                  collection: "sigmf.sigmffile.SigMFCollection" = None,
                  path: Union[str, os.PathLike] = None,
-                 fileobj: BinaryIO = None):
+                 fileobj: BinaryIO = None,
+                 pretty=True):
 
         if (not path) and (not fileobj):
             raise SigMFFileError("'path' or 'fileobj' required for creating "
@@ -105,7 +109,7 @@ class SigMFArchive():
 
         if collection:
             with tempfile.NamedTemporaryFile(mode="w") as tmpfile:
-                collection.dump(tmpfile, pretty=True)
+                collection.dump(tmpfile, pretty=pretty)
                 tmpfile.flush()
                 collection_filename = archive_name + SIGMF_COLLECTION_EXT
                 sigmf_archive.add(tmpfile.name,
@@ -120,7 +124,7 @@ class SigMFArchive():
                 sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
 
                 with open(sigmf_md_path, "w") as mdfile:
-                    sigmffile.dump(mdfile, pretty=True)
+                    sigmffile.dump(mdfile, pretty=pretty)
 
                 shutil.copy(sigmffile.data_file, sigmf_data_path)
                 sigmf_archive.add(tmpdir, arcname=sigmffile.name, filter=chmod)

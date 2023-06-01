@@ -542,17 +542,16 @@ class SigMFFile(SigMFMetafile):
         version = self.get_global_field(self.VERSION_KEY)
         validate.validate(self._metadata, self.get_schema())
 
-    def archive(self, file_path=None, fileobj=None):
+    def archive(self, file_path=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
-        `file_path` is passed to SigMFArchive `path` and `fileobj` is passed to
-        SigMFArchive `fileobj`.
-
+        `file_path` is passed to SigMFArchive `path`, `fileobj` is passed to
+        SigMFArchive `fileobj`, and `pretty` is passed to SigMFArchive `pretty`.
         """
         if file_path is None:
             file_path = self.name
 
-        archive = SigMFArchive(self, path=file_path, fileobj=fileobj)
+        archive = SigMFArchive(self, path=file_path, fileobj=fileobj, pretty=pretty)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -573,7 +572,7 @@ class SigMFFile(SigMFMetafile):
             self.validate()
         fns = get_sigmf_filenames(file_path)
         if toarchive:
-            self.archive(fns['archive_fn'])
+            self.archive(fns['archive_fn'], pretty=pretty)
         else:
             with open(fns['meta_fn'], 'w') as fp:
                 self.dump(fp, pretty=pretty)
@@ -706,7 +705,7 @@ class SigMFCollection(SigMFMetafile):
 
         metadata  -- collection metadata to use, if not provided this will populate a
                     minimal set of default metadata. The core:streams field will be
-                    regenerated automatically
+                    regenerated automatically. Can be str or dict.
         """
         super(SigMFCollection, self).__init__()
         self.skip_checksums = skip_checksums
@@ -848,11 +847,11 @@ class SigMFCollection(SigMFMetafile):
         """
         return self._metadata[self.COLLECTION_KEY].get(key, default)
 
-    def archive(self, file_path=None, fileobj=None):
+    def archive(self, file_path=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
         `file_path` is passed to SigMFArchive `path` and `fileobj` is passed to
-        SigMFArchive `fileobj`.
+        SigMFArchive `fileobj`, and `pretty` is passed to SigMFArchive `pretty`.
 
         """
 
@@ -860,7 +859,7 @@ class SigMFCollection(SigMFMetafile):
         for name in self.get_stream_names():
             sigmffile = self.get_SigMFFile(name)
             sigmffiles.append(sigmffile)
-        archive = SigMFArchive(sigmffiles, self, file_path, fileobj)
+        archive = SigMFArchive(sigmffiles, self, file_path, fileobj, pretty=pretty)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False):
@@ -879,7 +878,7 @@ class SigMFCollection(SigMFMetafile):
         '''
         fns = get_sigmf_filenames(file_path)
         if toarchive:
-            self.archive(fns['archive_fn'])
+            self.archive(fns['archive_fn'], pretty=pretty)
         else:
             with open(fns['collection_fn'], 'w') as fp:
                 self.dump(fp, pretty=pretty)
