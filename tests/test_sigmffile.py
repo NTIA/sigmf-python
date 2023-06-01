@@ -371,21 +371,30 @@ def test_create_collection_with_sigmffiles(test_sigmffile,
 def test_collection_set_sigmffiles(test_sigmffile,
                                    test_alternate_sigmffile,
                                    test_alternate_sigmffile_2):
-    input_sigmf_files = [test_sigmffile,
-                         test_alternate_sigmffile,
-                         test_alternate_sigmffile_2]
-    collection = SigMFCollection(metafiles=[test_sigmffile])
-    collection.set_streams(input_sigmf_files)
-    output_stream_names = collection.get_stream_names()
-    output_sigmf_files_by_name = []
-    for stream_name in output_stream_names:
-        output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
-        output_sigmf_files_by_name.append(output_sigmf_file)
-    output_sigmf_files_by_index = []
-    for i in range(len(collection)):
-        output_sigmf_file = collection.get_SigMFFile(stream_index=i)
-        output_sigmf_files_by_index.append(output_sigmf_file)
-    for input_sigmf in input_sigmf_files:
-        assert input_sigmf.name in output_stream_names
-        assert input_sigmf in output_sigmf_files_by_name
-        assert input_sigmf in output_sigmf_files_by_index
+    try:
+        input_sigmf_files = [test_sigmffile,
+                            test_alternate_sigmffile,
+                            test_alternate_sigmffile_2]
+        third_sigmf_meta_filename = test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+        streams_input = [test_sigmffile, test_alternate_sigmffile, third_sigmf_meta_filename]
+        with open(third_sigmf_meta_filename, "w") as out_f:
+            test_alternate_sigmffile_2.dump(out_f)
+        
+        collection = SigMFCollection(metafiles=[test_sigmffile])
+        collection.set_streams(streams_input)
+        output_stream_names = collection.get_stream_names()
+        output_sigmf_files_by_name = []
+        for stream_name in output_stream_names:
+            output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
+            output_sigmf_files_by_name.append(output_sigmf_file)
+        output_sigmf_files_by_index = []
+        for i in range(len(collection)):
+            output_sigmf_file = collection.get_SigMFFile(stream_index=i)
+            output_sigmf_files_by_index.append(output_sigmf_file)
+        for input_sigmf in input_sigmf_files:
+            assert input_sigmf.name in output_stream_names
+            assert input_sigmf in output_sigmf_files_by_name
+            assert input_sigmf in output_sigmf_files_by_index
+    finally:
+        if os.path.exists(third_sigmf_meta_filename):
+            os.remove(third_sigmf_meta_filename)
