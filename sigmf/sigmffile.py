@@ -698,7 +698,7 @@ class SigMFCollection(SigMFMetafile):
 
         Parameters:
 
-        metafiles -- A list of SigMF metadata filenames objects or SigMFFile
+        metafiles -- A list of SigMF metadata filenames or SigMFFile
                     objects comprising the Collection, there must be at least
                     one file. If the files do not exist, this will raise a
                     SigMFFileError.
