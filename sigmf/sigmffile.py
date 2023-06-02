@@ -545,13 +545,30 @@ class SigMFFile(SigMFMetafile):
     def archive(self, file_path=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
-        `file_path` is passed to SigMFArchive `path`, `fileobj` is passed to
-        SigMFArchive `fileobj`, and `pretty` is passed to SigMFArchive `pretty`.
+        Keyword arguments:
+        file_path -- passed to SigMFArchive`path`. Path to archive file to
+                     create. If file exists, overwrite. If `path` doesn't end
+                     in .sigmf, it will be appended. If not given, `file_path`
+                     will be set to self.name. (default None)
+        fileobj   -- passed to SigMFArchive `fileobj`. If `fileobj` is
+                     specified, it is used as an alternative to a file object
+                     opened in binary mode for `file_path`. If `fileobj` is an
+                     open tarfile, it will be appended to. It is supposed to
+                     be at position 0. `fileobj` won't be closed. If `fileobj`
+                     is given, `file_path` has no effect. (default None)
+        pretty    -- passed to SigMFArchive `pretty`. If True, pretty print
+                     JSON when creating the metadata and collection files in
+                     the archive. (default True).
+
+        Returns the path to the created archive.
         """
         if file_path is None:
             file_path = self.name
 
-        archive = SigMFArchive(self, path=file_path, fileobj=fileobj, pretty=pretty)
+        archive = SigMFArchive(self,
+                               path=file_path,
+                               fileobj=fileobj,
+                               pretty=pretty)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -850,16 +867,32 @@ class SigMFCollection(SigMFMetafile):
     def archive(self, file_path=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
-        `file_path` is passed to SigMFArchive `path` and `fileobj` is passed to
-        SigMFArchive `fileobj`, and `pretty` is passed to SigMFArchive `pretty`.
+        Keyword arguments:
+        file_path -- passed to SigMFArchive`path`. Path to archive file to
+                     create. If file exists, overwrite. If `path` doesn't end
+                     in .sigmf, it will be appended. (default None)
+        fileobj   -- passed to SigMFArchive `fileobj`. If `fileobj` is
+                     specified, it is used as an alternative to a file object
+                     opened in binary mode for `file_path`. If `fileobj` is an
+                     open tarfile, it will be appended to. It is supposed to
+                     be at position 0. `fileobj` won't be closed. If `fileobj`
+                     is given, `file_path` has no effect. (default None)
+        pretty    -- passed to SigMFArchive `pretty`. If True, pretty print
+                     JSON when creating the metadata and collection files in
+                     the archive. (default True).
 
+        Returns the path to the created archive.
         """
 
         sigmffiles = []
         for name in self.get_stream_names():
             sigmffile = self.get_SigMFFile(name)
             sigmffiles.append(sigmffile)
-        archive = SigMFArchive(sigmffiles, self, file_path, fileobj, pretty=pretty)
+        archive = SigMFArchive(sigmffiles,
+                               self,
+                               file_path,
+                               fileobj,
+                               pretty=pretty)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False):
