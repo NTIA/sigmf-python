@@ -148,6 +148,21 @@ def test_fromarchive_multi_recording(test_sigmffile,
         assert list_of_sigmffiles[2] == test_alternate_sigmffile_2
 
 
+def test_fromarchive_multirec_with_collection(test_sigmffile,
+                                              test_alternate_sigmffile):
+    with tempfile.NamedTemporaryFile(delete=True) as tf:
+        # Create a multi-recording archive with collection
+        in_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        in_collection = SigMFCollection(in_sigmffiles)
+        arch = SigMFArchive(in_sigmffiles,
+                            collection=in_collection,
+                            path=tf.name)
+        out_sigmffiles, out_collection = fromarchive(archive_path=arch.path)
+        assert len(out_sigmffiles) == 2
+        assert in_sigmffiles == out_sigmffiles
+        assert in_collection == out_collection
+
+
 def test_add_multiple_captures_and_annotations():
     sigf = SigMFFile(name="test")
     for idx in range(3):

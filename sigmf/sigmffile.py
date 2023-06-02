@@ -1037,6 +1037,11 @@ def fromarchive(archive_path, dir=None):
 
     The `dir` parameter is no longer used as this function has been changed to
     access SigMF archives without extracting them.
+
+    If the archive contains a single recording, a single SigMFFile object will
+    be returned. If the archive contains multiple recordings a list of
+    SigMFFile objects will be returned. If the archive contains a collection,
+    a tuple (SigMFFile(s), SigMFCollection) will be returned.
     """
     from .archivereader import SigMFArchiveReader
     reader = SigMFArchiveReader(archive_path)
@@ -1068,8 +1073,8 @@ def fromfile(filename, skip_checksum=False):
 
     Returns
     -------
-    object
-        SigMFFile object with dataset & metadata or a SigMFCollection depending on the type of file
+    SigMFFile object(s) with dataset & metadata and/or a SigMFCollection
+    depending on the type of file or contents of archive.
     '''
     fns = get_sigmf_filenames(filename)
     meta_fn = fns['meta_fn']

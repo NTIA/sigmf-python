@@ -25,6 +25,11 @@ class SigMFArchiveReader():
 
       path    -- path to archive file to access. If file does not exist,
                  or if `path` doesn't end in .sigmf, SigMFFileError is raised.
+
+    self.sigmffiles will contain the SigMFFile(s) (metadata/data) found in the
+    archive.
+
+    self.collection will contain the SigMFCollection if found in the archive.
     """
     def __init__(self, path=None, skip_checksum=False, map_readonly=True, archive_buffer=None):
         self.path = path

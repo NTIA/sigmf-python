@@ -118,17 +118,6 @@ def test_tarfile_names_and_extensions(test_sigmffile):
         assert file2_ext in file_extensions
 
 
-def test_sf_fromarchive_multirec(test_sigmffile, test_alternate_sigmffile):
-    """`SigMFFile.fromarchive` should return list of SigMFFiles."""
-    with tempfile.NamedTemporaryFile(delete=True) as tf:
-        # Create a multi-recording archive
-        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
-        arch = SigMFArchive(input_sigmffiles, path=tf.name)
-        output_sigmf_files = sigmffile.fromarchive(archive_path=arch.path)
-        assert len(output_sigmf_files) == 2
-        assert input_sigmffiles == output_sigmf_files
-
-
 def test_multirec_archive_into_fileobj(test_sigmffile,
                                        test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:
