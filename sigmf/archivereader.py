@@ -46,7 +46,7 @@ class SigMFArchiveReader():
                 tar_obj = tarfile.open(fileobj=archive_buffer, mode='r:')
 
             else:
-                raise ValueError('In sigmf.archivereader.__init__(), either `name` or `archive_buffer` must be not None')
+                raise ValueError('In sigmf.archivereader.__init__(), either `path` or `archive_buffer` must be not None')
 
             json_contents = None
             data_offset_size = None
