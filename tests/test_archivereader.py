@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 
 import numpy as np
@@ -118,3 +119,75 @@ def test_extract_multi_recording_with_collection(test_sigmffile,
             os.remove(meta2_filepath)
         if os.path.exists(archive_path):
             os.remove(archive_path)
+
+
+def test_archivereader_different_folder(test_sigmffile,
+                                        test_alternate_sigmffile):
+    try:
+        os.makedirs("folder1", exist_ok=True)
+        test_sigmffile.name = os.path.join("folder1", "test1")
+        os.makedirs("folder2", exist_ok=True)
+        test_alternate_sigmffile.name = os.path.join("folder2", "test2")
+        meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
+        with open(meta1_filepath, "w") as meta_fd:
+            test_sigmffile.dump(meta_fd)
+        meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
+        with open(meta2_filepath, "w") as meta_fd:
+            test_alternate_sigmffile.dump(meta_fd)
+        collection = SigMFCollection(metafiles=[meta1_filepath,
+                                                meta2_filepath])
+        os.makedirs("archive_folder", exist_ok=True)
+        archive_path = os.path.join("archive_folder", "test_archive.sigmf")
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        arch = SigMFArchive(input_sigmffiles, collection, path=archive_path)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 2  # number of SigMFFiles
+        for actual_sigmffile in reader:
+            assert actual_sigmffile in input_sigmffiles
+        assert collection == reader.collection
+    finally:
+        if os.path.exists(meta1_filepath):
+            os.remove(meta1_filepath)
+        if os.path.exists(meta2_filepath):
+            os.remove(meta2_filepath)
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+        if os.path.exists("folder1"):
+            shutil.rmtree("folder1")
+        if os.path.exists("folder2"):
+            shutil.rmtree("folder2")
+        if os.path.exists("archive_folder"):
+            shutil.rmtree("archive_folder")
+
+
+def test_archivereader_same_folder(test_sigmffile,
+                                   test_alternate_sigmffile):
+    try:
+        os.makedirs("folder1", exist_ok=True)
+        test_sigmffile.name = os.path.join("folder1", "test1")
+        test_alternate_sigmffile.name = os.path.join("folder1", "test2")
+        meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
+        with open(meta1_filepath, "w") as meta_fd:
+            test_sigmffile.dump(meta_fd)
+        meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
+        with open(meta2_filepath, "w") as meta_fd:
+            test_alternate_sigmffile.dump(meta_fd)
+        collection = SigMFCollection(metafiles=[meta1_filepath,
+                                                meta2_filepath])
+        archive_path = os.path.join("folder1", "test_archive.sigmf")
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        arch = SigMFArchive(input_sigmffiles, collection, path=archive_path)
+        reader = SigMFArchiveReader(arch.path)
+        assert len(reader) == 2  # number of SigMFFiles
+        for actual_sigmffile in reader:
+            assert actual_sigmffile in input_sigmffiles
+        assert collection == reader.collection
+    finally:
+        if os.path.exists(meta1_filepath):
+            os.remove(meta1_filepath)
+        if os.path.exists(meta2_filepath):
+            os.remove(meta2_filepath)
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+        if os.path.exists("folder1"):
+            shutil.rmtree("folder1")

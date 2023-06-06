@@ -726,6 +726,7 @@ class SigMFCollection(SigMFMetafile):
         """
         super(SigMFCollection, self).__init__()
         self.skip_checksums = skip_checksums
+        self.sigmffiles = []
 
         if metadata is None:
             self._metadata = {self.COLLECTION_KEY:{}}
@@ -773,19 +774,20 @@ class SigMFCollection(SigMFMetafile):
                     raise SigMFFileError('Calculated file hash for metadata '
                                          f'file {metafile_name} does not '
                                          'match collection metadata.')
-            sigmffile = [x for x in self.sigmffiles
-                         if x.name == stream.get('name')][0]
-            sigmffile_meta = sigmffile.dumps()
-            sigmffile_bytes = sigmffile_meta.encode('utf-8')
-            size_of_meta = len(sigmffile_bytes)
-            sigmffile_hash = sigmf_hash.calculate_sha512(
-                fileobj=BytesIO(sigmffile_bytes),
-                offset_and_size=(0, size_of_meta)
-            )
-            if old_hash != sigmffile_hash:
-                raise SigMFFileError('Calculated file hash for SigMFFile '
-                                     f'{sigmffile.name} does not match '
-                                     'collection metadata.')
+            if self.sigmffiles:
+                sigmffile = [x for x in self.sigmffiles
+                             if x.name == stream.get('name')][0]
+                sigmffile_meta = sigmffile.dumps()
+                sigmffile_bytes = sigmffile_meta.encode('utf-8')
+                size_of_meta = len(sigmffile_bytes)
+                sigmffile_hash = sigmf_hash.calculate_sha512(
+                    fileobj=BytesIO(sigmffile_bytes),
+                    offset_and_size=(0, size_of_meta)
+                )
+                if old_hash != sigmffile_hash:
+                    raise SigMFFileError('Calculated file hash for SigMFFile '
+                                         f'{sigmffile.name} does not match '
+                                         'collection metadata.')
 
     def set_streams(self, metafiles):
         '''
@@ -921,11 +923,12 @@ class SigMFCollection(SigMFMetafile):
         Returns the SigMFFile instance of the specified stream if it exists
         '''
         sigmffile = None
-        if stream_name is not None:
-            sigmffile = [x for x in self.sigmffiles
-                         if x.name == stream_name][0]
-        if stream_index is not None and stream_index < self.__len__():
-            sigmffile = self.sigmffiles[stream_index]
+        if self.sigmffiles:
+            if stream_name is not None:
+                sigmffile = [x for x in self.sigmffiles
+                             if x.name == stream_name][0]
+            if stream_index is not None and stream_index < self.__len__():
+                sigmffile = self.sigmffiles[stream_index]
         return sigmffile
 
 

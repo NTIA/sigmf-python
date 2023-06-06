@@ -118,6 +118,33 @@ def test_tarfile_names_and_extensions(test_sigmffile):
         assert file2_ext in file_extensions
 
 
+def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
+    with tempfile.NamedTemporaryFile() as temp:
+        test_sigmffile.name = os.path.join("test_folder", "test")
+        sigmf_tarfile = create_test_archive(test_sigmffile, temp)
+        basedir, file1, file2 = sigmf_tarfile.getmembers()
+        sigmffile_name = basedir.name
+        assert sigmffile_name == test_sigmffile.name
+        archive_name = sigmf_tarfile.name
+        assert archive_name == temp.name
+        path.split(temp.name)[-1]
+        file_extensions = {SIGMF_DATASET_EXT, SIGMF_METADATA_EXT}
+
+        file1_name, file1_ext = path.splitext(file1.name)
+        assert file1_ext in file_extensions
+        # name of recording should match folder containing sigmf metadata/data
+        assert path.split(file1_name)[0] == test_sigmffile.name
+        assert path.split(file1_name)[-1] == path.basename(test_sigmffile.name)
+
+        file_extensions.remove(file1_ext)
+
+        file2_name, file2_ext = path.splitext(file2.name)
+        # name of recording should match folder containing sigmf metadata/data
+        assert path.split(file2_name)[0] == test_sigmffile.name
+        assert path.split(file2_name)[-1] == path.basename(test_sigmffile.name)
+        assert file2_ext in file_extensions
+
+
 def test_multirec_archive_into_fileobj(test_sigmffile,
                                        test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:

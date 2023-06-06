@@ -118,9 +118,12 @@ class SigMFArchive():
 
         for sigmffile in self.sigmffiles:
             with tempfile.TemporaryDirectory() as tmpdir:
-                sigmf_md_filename = sigmffile.name + SIGMF_METADATA_EXT
+                sigmffile_name = sigmffile.name
+                if os.sep in sigmffile.name:
+                    _, sigmffile_name = os.path.split(sigmffile.name)
+                sigmf_md_filename = sigmffile_name + SIGMF_METADATA_EXT
                 sigmf_md_path = os.path.join(tmpdir, sigmf_md_filename)
-                sigmf_data_filename = sigmffile.name + SIGMF_DATASET_EXT
+                sigmf_data_filename = sigmffile_name + SIGMF_DATASET_EXT
                 sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
 
                 with open(sigmf_md_path, "w") as mdfile:
