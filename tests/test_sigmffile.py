@@ -26,7 +26,9 @@ import numpy as np
 import unittest
 
 from sigmf import sigmffile, utils
-from sigmf.sigmffile import SigMFFile
+from sigmf.archivereader import SigMFArchiveReader
+from sigmf.sigmffile import SigMFCollection, SigMFFile, fromarchive
+from sigmf.archive import SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
 
 from .testdata import *
 
@@ -35,8 +37,10 @@ class TestClassMethods(unittest.TestCase):
     def setUp(self):
         '''assure tests have a valid SigMF object to work with'''
         _, temp_path = tempfile.mkstemp()
-        TEST_FLOAT32_DATA.tofile(temp_path)
-        self.sigmf_object = SigMFFile(TEST_METADATA, data_file=temp_path)
+        TEST_FLOAT32_DATA_1.tofile(temp_path)
+        self.sigmf_object = SigMFFile("test",
+                                      TEST_METADATA_1,
+                                      data_file=temp_path)
 
     def test_iterator_basic(self):
         '''make sure default batch_size works'''
@@ -64,39 +68,103 @@ def simulate_capture(sigmf_md, n, capture_len):
 
 
 def test_default_constructor():
-    SigMFFile()
+    SigMFFile(name="test")
 
 
 def test_set_non_required_global_field():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.set_global_field('this_is:not_in_the_schema', None)
 
 
 def test_add_capture():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.add_capture(start_index=0, metadata={})
 
 
 def test_add_annotation():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     sigf.add_capture(start_index=0)
     meta = {"latitude": 40.0, "longitude": -105.0}
     sigf.add_annotation(start_index=0, length=128, metadata=meta)
+
+
+def test_add_annotation_with_duplicate_key():
+    f = SigMFFile(name="test")
+    f.add_capture(start_index=0)
+    m1 = {"latitude": 40.0, "longitude": -105.0}
+    f.add_annotation(start_index=0, length=128, metadata=m1)
+    m2 = {"latitude": 50.0, "longitude": -115.0}
+    f.add_annotation(start_index=0, length=128, metadata=m2)
+    assert len(f.get_annotations(64)) == 2
 
 
 def test_fromarchive(test_sigmffile):
     print("test_sigmffile is:\n", test_sigmffile)
     tf = tempfile.mkstemp()[1]
     td = tempfile.mkdtemp()
-    archive_path = test_sigmffile.archive(name=tf)
+    archive_path = test_sigmffile.archive(file_path=tf)
     result = sigmffile.fromarchive(archive_path=archive_path, dir=td)
-    assert result._metadata == test_sigmffile._metadata == TEST_METADATA
+    assert result == test_sigmffile
     os.remove(tf)
     shutil.rmtree(td)
 
 
+def test_fromarchive_multi_recording(test_sigmffile,
+                                     test_alternate_sigmffile,
+                                     test_alternate_sigmffile_2):
+    # single recording
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        test_sigmffile.archive(fileobj=t_file)
+        single_sigmffile = fromarchive(path)
+        assert isinstance(single_sigmffile, SigMFFile)
+        assert single_sigmffile == test_sigmffile
+
+    # 2 recordings
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        SigMFArchive(input_sigmffiles, fileobj=t_file)
+        sigmffile_one, sigmffile_two = fromarchive(path)
+        assert isinstance(sigmffile_one, SigMFFile)
+        assert sigmffile_one == test_sigmffile
+        assert isinstance(sigmffile_two, SigMFFile)
+        assert sigmffile_two == test_alternate_sigmffile
+
+    # 3 recordings
+    with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
+        path = t_file.name
+        input_sigmffiles = [test_sigmffile,
+                            test_alternate_sigmffile,
+                            test_alternate_sigmffile_2]
+        SigMFArchive(input_sigmffiles, fileobj=t_file)
+        list_of_sigmffiles = fromarchive(path)
+        assert len(list_of_sigmffiles) == 3
+        assert isinstance(list_of_sigmffiles[0], SigMFFile)
+        assert list_of_sigmffiles[0] == test_sigmffile
+        assert isinstance(list_of_sigmffiles[1], SigMFFile)
+        assert list_of_sigmffiles[1] == test_alternate_sigmffile
+        assert isinstance(list_of_sigmffiles[2], SigMFFile)
+        assert list_of_sigmffiles[2] == test_alternate_sigmffile_2
+
+
+def test_fromarchive_multirec_with_collection(test_sigmffile,
+                                              test_alternate_sigmffile):
+    with tempfile.NamedTemporaryFile(delete=True) as tf:
+        # Create a multi-recording archive with collection
+        in_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        in_collection = SigMFCollection(in_sigmffiles)
+        arch = SigMFArchive(in_sigmffiles,
+                            collection=in_collection,
+                            path=tf.name)
+        out_sigmffiles, out_collection = fromarchive(archive_path=arch.path)
+        assert len(out_sigmffiles) == 2
+        assert in_sigmffiles == out_sigmffiles
+        assert in_collection == out_collection
+
+
 def test_add_multiple_captures_and_annotations():
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     for idx in range(3):
         simulate_capture(sigf, idx, 1024)
 
@@ -124,6 +192,7 @@ def test_multichannel_types():
                 # for real or complex
                 check_count = raw_count * 1 # deepcopy
                 temp_signal = SigMFFile(
+                    name="test",
                     data_file=temp_path,
                     global_info={
                         SigMFFile.DATATYPE_KEY: f'{complex_prefix}{key}_le',
@@ -149,6 +218,7 @@ def test_multichannel_seek():
     # write some dummy data and read back
     np.arange(18, dtype=np.uint16).tofile(temp_path)
     temp_signal = SigMFFile(
+        name="test",
         data_file=temp_path,
         global_info={
             SigMFFile.DATATYPE_KEY: 'cu16_le',
@@ -163,7 +233,7 @@ def test_multichannel_seek():
 
 def test_key_validity():
     '''assure the keys in test metadata are valid'''
-    for top_key, top_val in TEST_METADATA.items():
+    for top_key, top_val in TEST_METADATA_1.items():
         if type(top_val) is dict:
             for core_key in top_val.keys():
                 assert core_key in vars(SigMFFile)[f'VALID_{top_key.upper()}_KEYS']
@@ -178,7 +248,7 @@ def test_key_validity():
 
 def test_ordered_metadata():
     '''check to make sure the metadata is sorted as expected'''
-    sigf = SigMFFile()
+    sigf = SigMFFile(name="test")
     top_sort_order = ['global', 'captures', 'annotations']
     for kdx, key in enumerate(sigf.ordered_metadata()):
         assert kdx == top_sort_order.index(key)
@@ -242,3 +312,104 @@ def test_captures_checking():
     assert (160,224) == sigmf4.get_capture_byte_boundarys(1)
     assert np.array_equal(np.array(range(64)), sigmf4.read_samples_in_capture(0,autoscale=False)[:,0])
     assert np.array_equal(np.array(range(64,96)), sigmf4.read_samples_in_capture(1,autoscale=False)[:,1])
+
+
+def test_archive_collection(test_sigmffile,
+                            test_alternate_sigmffile,
+                            test_alternate_sigmffile_2):
+    sigmf_meta_files = [
+        test_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile.name + SIGMF_METADATA_EXT,
+        test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+    ]
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    data = [TEST_FLOAT32_DATA_1, TEST_FLOAT32_DATA_2, TEST_FLOAT32_DATA_3]
+    try:
+        for sigmf_meta_file, sigmf_file, _data in zip(sigmf_meta_files,
+                                                      input_sigmf_files,
+                                                      data):
+            with open(sigmf_meta_file, mode="w") as sigmf_meta_fd:
+                sigmf_file.dump(sigmf_meta_fd)
+            sample_data = sigmf_file.read_samples(autoscale=False,
+                                                  raw_components=True)
+            assert np.array_equal(sample_data, _data)
+            sample_data.tofile(sigmf_file.name + SIGMF_DATASET_EXT)
+        test_collection = sigmffile.SigMFCollection(sigmf_meta_files)
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            archive_path = test_collection.archive(fileobj=tmpfile)
+            archive_reader = SigMFArchiveReader(path=archive_path)
+            for input_sigmf_file in input_sigmf_files:
+                assert input_sigmf_file in archive_reader.sigmffiles
+            assert test_collection == archive_reader.collection
+        with tempfile.NamedTemporaryFile(suffix=".sigmf") as tmpfile:
+            test_collection.tofile(tmpfile.name, toarchive=True)
+            archive_reader = SigMFArchiveReader(path=tmpfile.name)
+            for input_sigmf_file in input_sigmf_files:
+                assert input_sigmf_file in archive_reader.sigmffiles
+            assert test_collection == archive_reader.collection
+            for input_sigmf_file in input_sigmf_files:
+                assert input_sigmf_file in test_collection.sigmffiles
+    finally:
+        for sigmf_meta_file in sigmf_meta_files:
+            if os.path.exists(sigmf_meta_file):
+                os.remove(sigmf_meta_file)
+        for sigmf_file in input_sigmf_files:
+            filename = sigmf_file.name + SIGMF_DATASET_EXT
+            if os.path.exists(filename):
+                os.remove(filename)
+
+
+def test_create_collection_with_sigmffiles(test_sigmffile,
+                                           test_alternate_sigmffile,
+                                           test_alternate_sigmffile_2):
+    input_sigmf_files = [test_sigmffile,
+                         test_alternate_sigmffile,
+                         test_alternate_sigmffile_2]
+    collection = SigMFCollection(metafiles=input_sigmf_files)
+    output_stream_names = collection.get_stream_names()
+    output_sigmf_files_by_name = []
+    for stream_name in output_stream_names:
+        output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
+        output_sigmf_files_by_name.append(output_sigmf_file)
+    output_sigmf_files_by_index = []
+    for i in range(len(collection)):
+        output_sigmf_file = collection.get_SigMFFile(stream_index=i)
+        output_sigmf_files_by_index.append(output_sigmf_file)
+    for input_sigmf in input_sigmf_files:
+        assert input_sigmf.name in output_stream_names
+        assert input_sigmf in output_sigmf_files_by_name
+        assert input_sigmf in output_sigmf_files_by_index
+
+
+def test_collection_set_sigmffiles(test_sigmffile,
+                                   test_alternate_sigmffile,
+                                   test_alternate_sigmffile_2):
+    try:
+        input_sigmf_files = [test_sigmffile,
+                            test_alternate_sigmffile,
+                            test_alternate_sigmffile_2]
+        third_sigmf_meta_filename = test_alternate_sigmffile_2.name + SIGMF_METADATA_EXT
+        streams_input = [test_sigmffile, test_alternate_sigmffile, third_sigmf_meta_filename]
+        with open(third_sigmf_meta_filename, "w") as out_f:
+            test_alternate_sigmffile_2.dump(out_f)
+        
+        collection = SigMFCollection(metafiles=[test_sigmffile])
+        collection.set_streams(streams_input)
+        output_stream_names = collection.get_stream_names()
+        output_sigmf_files_by_name = []
+        for stream_name in output_stream_names:
+            output_sigmf_file = collection.get_SigMFFile(stream_name=stream_name)
+            output_sigmf_files_by_name.append(output_sigmf_file)
+        output_sigmf_files_by_index = []
+        for i in range(len(collection)):
+            output_sigmf_file = collection.get_SigMFFile(stream_index=i)
+            output_sigmf_files_by_index.append(output_sigmf_file)
+        for input_sigmf in input_sigmf_files:
+            assert input_sigmf.name in output_stream_names
+            assert input_sigmf in output_sigmf_files_by_name
+            assert input_sigmf in output_sigmf_files_by_index
+    finally:
+        if os.path.exists(third_sigmf_meta_filename):
+            os.remove(third_sigmf_meta_filename)

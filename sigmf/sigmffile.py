@@ -8,7 +8,9 @@
 
 from collections import OrderedDict
 import codecs
+from io import BytesIO
 import json
+import os
 import tarfile
 import tempfile
 from os import path
@@ -18,7 +20,7 @@ import numpy as np
 from . import __version__, schema, sigmf_hash, validate
 from .archive import SigMFArchive, SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT, SIGMF_COLLECTION_EXT
 from .utils import dict_merge
-from .error import SigMFFileError, SigMFAccessError
+from .error import SigMFError, SigMFFileError, SigMFAccessError
 
 class SigMFMetafile():
     VALID_KEYS = {}
@@ -78,6 +80,7 @@ class SigMFMetafile():
             indent=4 if pretty else None,
             separators=(',', ': ') if pretty else None,
         )
+        filep.write("\n")
 
     def dumps(self, pretty=True):
         '''
@@ -97,7 +100,7 @@ class SigMFMetafile():
             self.ordered_metadata(),
             indent=4 if pretty else None,
             separators=(',', ': ') if pretty else None,
-        )
+        ) + "\n"
 
 class SigMFFile(SigMFMetafile):
     START_INDEX_KEY = "core:sample_start"
@@ -148,12 +151,25 @@ class SigMFFile(SigMFMetafile):
     ]
     VALID_KEYS = {GLOBAL_KEY: VALID_GLOBAL_KEYS, CAPTURE_KEY: VALID_CAPTURE_KEYS, ANNOTATION_KEY: VALID_ANNOTATION_KEYS}
 
-    def __init__(self, metadata=None, data_file=None, global_info=None, skip_checksum=False, map_readonly=True):
+    def __init__(self,
+                 name,
+                 metadata=None,
+                 data_file=None,
+                 global_info=None,
+                 skip_checksum=False,
+                 map_readonly=True):
         '''
         API for SigMF I/O
 
         Parameters
         ----------
+        name: Name used for directory and filenames if archived.
+                     For example, given `name=archive1`, then passing this
+                     sigmffile to SigMFArchive will add the following files
+                     to the archive:
+                        - archive1/
+                          - archive1.sigmf-meta
+                          - archive1.sigmf-data
         metadata: str or dict, optional
             Metadata for associated dataset.
         data_file: str, optional
@@ -183,6 +199,7 @@ class SigMFFile(SigMFMetafile):
             self.set_global_info(global_info)
         if data_file is not None:
             self.set_data_file(data_file, skip_checksum=skip_checksum, map_readonly=map_readonly)
+        self.name = name
 
     def __len__(self):
         return self._memmap.shape[0]
@@ -212,6 +229,20 @@ class SigMFFile(SigMFMetafile):
             else:
                 raise ValueError("unhandled ndim in SigMFFile.__getitem__(); this shouldn't happen")
         return a
+
+    def __eq__(self, other):
+        """Define equality between two `SigMFFile`s.
+
+        Rely on the `core:sha512` value in the metadata to decide whether
+        `data_file` is the same since the same sigmf archive could be extracted
+        twice to two different temp directories and the SigMFFiles should still
+        be equivalent.
+
+        """
+        if isinstance(other, SigMFFile):
+            return self._metadata == other._metadata
+
+        return False
 
     def _get_start_offset(self):
         """
@@ -511,13 +542,33 @@ class SigMFFile(SigMFMetafile):
         version = self.get_global_field(self.VERSION_KEY)
         validate.validate(self._metadata, self.get_schema())
 
-    def archive(self, name=None, fileobj=None):
+    def archive(self, file_path=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
-        `name` and `fileobj` are passed to SigMFArchive and are defined there.
+        Keyword arguments:
+        file_path -- passed to SigMFArchive`path`. Path to archive file to
+                     create. If file exists, overwrite. If `path` doesn't end
+                     in .sigmf, it will be appended. If not given, `file_path`
+                     will be set to self.name. (default None)
+        fileobj   -- passed to SigMFArchive `fileobj`. If `fileobj` is
+                     specified, it is used as an alternative to a file object
+                     opened in binary mode for `file_path`. If `fileobj` is an
+                     open tarfile, it will be appended to. It is supposed to
+                     be at position 0. `fileobj` won't be closed. If `fileobj`
+                     is given, `file_path` has no effect. (default None)
+        pretty    -- passed to SigMFArchive `pretty`. If True, pretty print
+                     JSON when creating the metadata and collection files in
+                     the archive. (default True).
 
+        Returns the path to the created archive.
         """
-        archive = SigMFArchive(self, name, fileobj)
+        if file_path is None:
+            file_path = self.name
+
+        archive = SigMFArchive(self,
+                               path=file_path,
+                               fileobj=fileobj,
+                               pretty=pretty)
         return archive.path
 
     def tofile(self, file_path, pretty=True, toarchive=False, skip_validate=False):
@@ -538,11 +589,10 @@ class SigMFFile(SigMFMetafile):
             self.validate()
         fns = get_sigmf_filenames(file_path)
         if toarchive:
-            self.archive(fns['archive_fn'])
+            self.archive(fns['archive_fn'], pretty=pretty)
         else:
             with open(fns['meta_fn'], 'w') as fp:
                 self.dump(fp, pretty=pretty)
-                fp.write('\n')  # text files should end in carriage return
 
     def read_samples_in_capture(self, index=0, autoscale=True):
         '''
@@ -602,7 +652,10 @@ class SigMFFile(SigMFMetafile):
 
         if not self._is_conforming_dataset():
             warnings.warn(f'Recording dataset appears non-compliant, resulting data may be erroneous')
-        return self._read_datafile(first_byte, count * self.get_num_channels(), autoscale, False)
+        return self._read_datafile(first_byte,
+                                   count * self.get_num_channels(),
+                                   autoscale,
+                                   raw_components)
 
     def _read_datafile(self, first_byte, nitems, autoscale, raw_components):
         '''
@@ -662,23 +715,27 @@ class SigMFCollection(SigMFMetafile):
 
         Parameters:
 
-        metafiles -- A list of SigMF metadata filenames objects comprising the Collection,
-                    there must be at least one file. If the files do not exist, this will
-                    raise a SigMFFileError.
+        metafiles -- A list of SigMF metadata filenames or SigMFFile
+                    objects comprising the Collection, there must be at least
+                    one file. If the files do not exist, this will raise a
+                    SigMFFileError.
 
         metadata  -- collection metadata to use, if not provided this will populate a
                     minimal set of default metadata. The core:streams field will be
-                    regenerated automatically
+                    regenerated automatically. Can be str or dict.
         """
         super(SigMFCollection, self).__init__()
         self.skip_checksums = skip_checksums
+        self.sigmffiles = []
 
         if metadata is None:
             self._metadata = {self.COLLECTION_KEY:{}}
             self._metadata[self.COLLECTION_KEY][self.VERSION_KEY] = __version__
             self._metadata[self.COLLECTION_KEY][self.STREAMS_KEY] = []
-        else:
+        elif isinstance(metadata, dict):
             self._metadata = metadata
+        else:
+            self._metadata = json.loads(metadata)
 
         if metafiles is None:
             self.metafiles = []
@@ -694,6 +751,15 @@ class SigMFCollection(SigMFMetafile):
         '''
         return len(self.get_stream_names())
 
+    def __eq__(self, other):
+        """Define equality between two `SigMFCollections's by comparing
+        metadata.
+        """
+        if isinstance(other, SigMFCollection):
+            return self._metadata == other._metadata
+
+        return False
+
     def verify_stream_hashes(self):
         '''
         compares the stream hashes in the collection metadata to the metadata files
@@ -705,23 +771,66 @@ class SigMFCollection(SigMFMetafile):
             if path.isfile(metafile_name):
                 new_hash = sigmf_hash.calculate_sha512(filename=metafile_name)
                 if old_hash != new_hash:
-                    raise SigMFFileError(f'Calculated file hash for {metafile_name} does not match collection metadata.')
+                    raise SigMFFileError('Calculated file hash for metadata '
+                                         f'file {metafile_name} does not '
+                                         'match collection metadata.')
+            if self.sigmffiles:
+                sigmffile = [x for x in self.sigmffiles
+                             if x.name == stream.get('name')][0]
+                sigmffile_meta = sigmffile.dumps()
+                sigmffile_bytes = sigmffile_meta.encode('utf-8')
+                size_of_meta = len(sigmffile_bytes)
+                sigmffile_hash = sigmf_hash.calculate_sha512(
+                    fileobj=BytesIO(sigmffile_bytes),
+                    offset_and_size=(0, size_of_meta)
+                )
+                if old_hash != sigmffile_hash:
+                    raise SigMFFileError('Calculated file hash for SigMFFile '
+                                         f'{sigmffile.name} does not match '
+                                         'collection metadata.')
 
     def set_streams(self, metafiles):
         '''
-        configures the collection `core:streams` field from the specified list of metafiles
+        configures the collection `core:streams` field from the specified list
+         of metafiles or SigMFFiles
         '''
-        self.metafiles = metafiles
         streams = []
-        for metafile in self.metafiles:
-            if metafile.endswith('.sigmf-meta') and path.isfile(metafile):
-                stream = {
-                    "name": get_sigmf_filenames(metafile)['base_fn'],
-                    "hash": sigmf_hash.calculate_sha512(filename=metafile)
-                }
-                streams.append(stream)
+        sigmffile_names = []
+        self.sigmffiles = []
+
+        for sigmffile in metafiles:
+            if isinstance(sigmffile, SigMFFile):
+                sigmffile_names.append(sigmffile.name + SIGMF_METADATA_EXT)
+                sigmffile_meta = sigmffile.dumps()
+                sigmffile_bytes = sigmffile_meta.encode('utf-8')
+                size_of_meta = len(sigmffile_bytes)
+                streams.append({
+                    "name": sigmffile.name,
+                    "hash": sigmf_hash.calculate_sha512(
+                                fileobj=BytesIO(sigmffile_bytes),
+                                offset_and_size=(0, size_of_meta))
+                })
+                self.sigmffiles.append(sigmffile)
+            elif (isinstance(sigmffile, str) or
+                  isinstance(sigmffile, os.PathLike)):
+                sigmffile_names.append(str(sigmffile))
+                if (str(sigmffile).endswith(SIGMF_METADATA_EXT) and
+                   path.isfile(sigmffile)):
+                    stream = {
+                        "name": get_sigmf_filenames(sigmffile)['base_fn'],
+                        "hash": sigmf_hash.calculate_sha512(filename=sigmffile)
+                    }
+                    streams.append(stream)
+                else:
+                    raise SigMFFileError(f'Specifed stream file {sigmffile} is'
+                                         ' not a valid SigMF Metadata file')
+                self.sigmffiles.append(
+                    fromfile(sigmffile, skip_checksum=self.skip_checksums)
+                )
             else:
-                raise SigMFFileError(f'Specifed stream file {metafile} is not a valid SigMF Metadata file')
+                raise SigMFError("Unknown type, set_streams() input must be"
+                                 " list of metafiles or SigMFFiles")
+        self.metafiles = sigmffile_names
         self.set_collection_field(self.STREAMS_KEY, streams)
 
     def get_stream_names(self):
@@ -757,9 +866,40 @@ class SigMFCollection(SigMFMetafile):
         """
         return self._metadata[self.COLLECTION_KEY].get(key, default)
 
-    def tofile(self, file_path, pretty=True):
+    def archive(self, file_path=None, fileobj=None, pretty=True):
+        """Dump contents to SigMF archive format.
+
+        Keyword arguments:
+        file_path -- passed to SigMFArchive`path`. Path to archive file to
+                     create. If file exists, overwrite. If `path` doesn't end
+                     in .sigmf, it will be appended. (default None)
+        fileobj   -- passed to SigMFArchive `fileobj`. If `fileobj` is
+                     specified, it is used as an alternative to a file object
+                     opened in binary mode for `file_path`. If `fileobj` is an
+                     open tarfile, it will be appended to. It is supposed to
+                     be at position 0. `fileobj` won't be closed. If `fileobj`
+                     is given, `file_path` has no effect. (default None)
+        pretty    -- passed to SigMFArchive `pretty`. If True, pretty print
+                     JSON when creating the metadata and collection files in
+                     the archive. (default True).
+
+        Returns the path to the created archive.
+        """
+
+        sigmffiles = []
+        for name in self.get_stream_names():
+            sigmffile = self.get_SigMFFile(name)
+            sigmffiles.append(sigmffile)
+        archive = SigMFArchive(sigmffiles,
+                               self,
+                               file_path,
+                               fileobj,
+                               pretty=pretty)
+        return archive.path
+
+    def tofile(self, file_path, pretty=True, toarchive=False):
         '''
-        Write metadata file
+        Write metadata file or create archive.
 
         Parameters
         ----------
@@ -767,25 +907,30 @@ class SigMFCollection(SigMFMetafile):
             Location to save.
         pretty : bool, default True
             When True will write more human-readable output, otherwise will be flat JSON.
+        toarchive : bool, default False
+            If True, create an archive from the collection file and recordings
+            instead of creating collection metadata file.
         '''
         fns = get_sigmf_filenames(file_path)
-        with open(fns['collection_fn'], 'w') as fp:
-            self.dump(fp, pretty=pretty)
-            fp.write('\n')  # text files should end in carriage return
+        if toarchive:
+            self.archive(fns['archive_fn'], pretty=pretty)
+        else:
+            with open(fns['collection_fn'], 'w') as fp:
+                self.dump(fp, pretty=pretty)
 
     def get_SigMFFile(self, stream_name=None, stream_index=None):
         '''
         Returns the SigMFFile instance of the specified stream if it exists
         '''
-        metafile = None
-        if stream_name is not None:
-            if stream_name in self.get_stream_names():
-                metafile = stream_name + '.sigmf_meta'
-        if stream_index is not None and stream_index < self.__len__():
-            metafile = self.get_stream_names()[stream_index] + '.sigmf_meta'
+        sigmffile = None
+        if self.sigmffiles:
+            if stream_name is not None:
+                sigmffile = [x for x in self.sigmffiles
+                             if x.name == stream_name][0]
+            if stream_index is not None and stream_index < self.__len__():
+                sigmffile = self.sigmffiles[stream_index]
+        return sigmffile
 
-        if metafile is not None:
-            return fromfile(metafile, skip_checksum=self.skip_checksums)
 
 def dtype_info(datatype):
     """
@@ -891,13 +1036,28 @@ def get_dataset_filename_from_metadata(meta_fn, metadata=None):
 
 
 def fromarchive(archive_path, dir=None):
-    """Extract an archive and return a SigMFFile.
+    """Extract an archive and return containing SigMFFiles and SigMFCollection.
 
     The `dir` parameter is no longer used as this function has been changed to
     access SigMF archives without extracting them.
+
+    If the archive contains a single recording, a single SigMFFile object will
+    be returned. If the archive contains multiple recordings a list of
+    SigMFFile objects will be returned. If the archive contains a collection,
+    a tuple (SigMFFile(s), SigMFCollection) will be returned.
     """
     from .archivereader import SigMFArchiveReader
-    return SigMFArchiveReader(archive_path).sigmffile
+    reader = SigMFArchiveReader(archive_path)
+    sigmffiles = reader.sigmffiles
+    sigmffile_ret = None
+    if len(sigmffiles) == 1:
+        sigmffile_ret = sigmffiles[0]
+    else:
+        sigmffile_ret = sigmffiles
+    if reader.collection:
+        return sigmffile_ret, reader.collection
+    else:
+        return sigmffile_ret
 
 
 def fromfile(filename, skip_checksum=False):
@@ -916,8 +1076,8 @@ def fromfile(filename, skip_checksum=False):
 
     Returns
     -------
-    object
-        SigMFFile object with dataset & metadata or a SigMFCollection depending on the type of file
+    SigMFFile object(s) with dataset & metadata and/or a SigMFCollection
+    depending on the type of file or contents of archive.
     '''
     fns = get_sigmf_filenames(filename)
     meta_fn = fns['meta_fn']
@@ -944,7 +1104,10 @@ def fromfile(filename, skip_checksum=False):
         meta_fp.close()
 
         data_fn = get_dataset_filename_from_metadata(meta_fn, metadata)
-        return SigMFFile(metadata=metadata, data_file=data_fn, skip_checksum=skip_checksum)
+        return SigMFFile(name=fns['base_fn'],
+                         metadata=metadata,
+                         data_file=data_fn,
+                         skip_checksum=skip_checksum)
 
 
 def get_sigmf_filenames(filename):
