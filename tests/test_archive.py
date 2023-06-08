@@ -55,8 +55,7 @@ def test_name_used_in_fileobj(test_sigmffile):
         sigmf_archive = test_sigmffile.archive(file_path="testarchive",
                                                fileobj=temp)
         sigmf_tarfile = tarfile.open(sigmf_archive, mode="r")
-        basedir, file1, file2 = sigmf_tarfile.getmembers()
-        assert basedir.name == test_sigmffile.name
+        file1, file2 = sigmf_tarfile.getmembers()
         assert sigmf_tarfile.name == temp.name
 
         def filename(tarinfo):
@@ -90,8 +89,7 @@ def test_unwritable_name_throws_fileerror(test_sigmffile):
 def test_tarfile_layout(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
-        basedir, file1, file2 = sigmf_tarfile.getmembers()
-        assert tarfile.TarInfo.isdir(basedir)
+        file1, file2 = sigmf_tarfile.getmembers()
         assert tarfile.TarInfo.isfile(file1)
         assert tarfile.TarInfo.isfile(file2)
 
@@ -99,9 +97,7 @@ def test_tarfile_layout(test_sigmffile):
 def test_tarfile_names_and_extensions(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
-        basedir, file1, file2 = sigmf_tarfile.getmembers()
-        sigmffile_name = basedir.name
-        assert sigmffile_name == test_sigmffile.name
+        file1, file2 = sigmf_tarfile.getmembers()
         archive_name = sigmf_tarfile.name
         assert archive_name == temp.name
         path.split(temp.name)[-1]
@@ -123,8 +119,7 @@ def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
         test_sigmffile.name = os.path.join("test_folder", "test")
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
         basedir, file1, file2 = sigmf_tarfile.getmembers()
-        sigmffile_name = basedir.name
-        assert sigmffile_name == test_sigmffile.name
+        assert "test_folder" == basedir.name
         archive_name = sigmf_tarfile.name
         assert archive_name == temp.name
         path.split(temp.name)[-1]
@@ -132,16 +127,12 @@ def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
 
         file1_name, file1_ext = path.splitext(file1.name)
         assert file1_ext in file_extensions
-        # name of recording should match folder containing sigmf metadata/data
-        assert path.split(file1_name)[0] == test_sigmffile.name
-        assert path.split(file1_name)[-1] == path.basename(test_sigmffile.name)
+        assert file1_name == test_sigmffile.name
 
         file_extensions.remove(file1_ext)
 
         file2_name, file2_ext = path.splitext(file2.name)
-        # name of recording should match folder containing sigmf metadata/data
-        assert path.split(file2_name)[0] == test_sigmffile.name
-        assert path.split(file2_name)[-1] == path.basename(test_sigmffile.name)
+        assert file2_name == test_sigmffile.name
         assert file2_ext in file_extensions
 
 
@@ -153,11 +144,13 @@ def test_multirec_archive_into_fileobj(test_sigmffile,
         # add a second one to the same fileobj
         multirec_tar = create_test_archive(test_alternate_sigmffile, t)
         members = multirec_tar.getmembers()
-        assert len(members) == 6  # 2 directories and 2 files per directory
+        assert len(members) == 4  # 2 metadata files + 2 data files
 
 
 def test_tarfile_persmissions(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
+        # add 'test1' to name to create 'test1' folder
+        test_sigmffile.name = "test1/test1"
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
         basedir, file1, file2 = sigmf_tarfile.getmembers()
         assert basedir.mode == 0o755
@@ -168,7 +161,7 @@ def test_tarfile_persmissions(test_sigmffile):
 def test_contents(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
-        basedir, file1, file2 = sigmf_tarfile.getmembers()
+        file1, file2 = sigmf_tarfile.getmembers()
         if file1.name.endswith(SIGMF_METADATA_EXT):
             mdfile = file1
             datfile = file2
@@ -234,8 +227,8 @@ def test_single_recording_with_collection(test_sigmffile):
                                    test_collection,
                                    fileobj=tmpfile)
             with tarfile.open(archive.path) as tar:
-                # 1 collection_file + 1 dir + 1 meta file + 1 data file
-                assert len(tar.getmembers()) == 4
+                # 1 collection_file + 1 meta file + 1 data file
+                assert len(tar.getmembers()) == 3
                 for member in tar.getmembers():
                     if member.isfile():
                         if member.name.endswith(SIGMF_COLLECTION_EXT):
@@ -271,8 +264,8 @@ def test_multiple_recordings_with_collection(test_sigmffile,
                                    test_collection,
                                    fileobj=tmpfile)
             with tarfile.open(archive.path) as tar:
-                # 1 collection_file + 3 dir + 3 meta file + 3 data file
-                assert len(tar.getmembers()) == 10
+                # 1 collection_file + 3 meta file + 3 data file
+                assert len(tar.getmembers()) == 7
                 for member in tar.getmembers():
                     if member.isfile():
                         if member.name.endswith(SIGMF_COLLECTION_EXT):

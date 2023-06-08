@@ -7,10 +7,11 @@
 """Create and extract SigMF archives."""
 
 import collections
+from io import BytesIO
 import os
-import shutil
 import tarfile
 import tempfile
+import time
 from typing import BinaryIO, Iterable, Union
 
 import sigmf
@@ -117,20 +118,23 @@ class SigMFArchive():
                                   filter=chmod)
 
         for sigmffile in self.sigmffiles:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sigmffile_name = sigmffile.name
-                if os.sep in sigmffile.name:
-                    _, sigmffile_name = os.path.split(sigmffile.name)
-                sigmf_md_filename = sigmffile_name + SIGMF_METADATA_EXT
-                sigmf_md_path = os.path.join(tmpdir, sigmf_md_filename)
-                sigmf_data_filename = sigmffile_name + SIGMF_DATASET_EXT
-                sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
-
-                with open(sigmf_md_path, "w") as mdfile:
-                    sigmffile.dump(mdfile, pretty=pretty)
-
-                shutil.copy(sigmffile.data_file, sigmf_data_path)
-                sigmf_archive.add(tmpdir, arcname=sigmffile.name, filter=chmod)
+            if os.path.sep in sigmffile.name:
+                parent, _ = os.path.split(sigmffile.name)
+                self._create_parent_dirs(sigmf_archive, parent, chmod)
+            sf_md_filename = sigmffile.name + SIGMF_METADATA_EXT
+            sf_data_filename = sigmffile.name + SIGMF_DATASET_EXT
+            metadata = sigmffile.dumps(pretty=pretty)
+            metadata_tarinfo = tarfile.TarInfo(sf_md_filename)
+            metadata_tarinfo.size = len(metadata)
+            metadata_tarinfo.mtime = time.time()
+            metadata_tarinfo = chmod(metadata_tarinfo)
+            metadata_buffer = BytesIO(metadata.encode("utf-8"))
+            sigmf_archive.addfile(metadata_tarinfo, fileobj=metadata_buffer)
+            data_tarinfo = sigmf_archive.gettarinfo(name=sigmffile.data_file,
+                                                    arcname=sf_data_filename)
+            data_tarinfo = chmod(data_tarinfo)
+            with open(sigmffile.data_file, "rb") as data_file:
+                sigmf_archive.addfile(data_tarinfo, fileobj=data_file)
 
         sigmf_archive.close()
         if not fileobj:
@@ -139,6 +143,22 @@ class SigMFArchive():
             sigmf_fileobj.seek(0)  # ensure next open can read this as a tar
 
         self.path = sigmf_archive.name
+
+    def _create_parent_dirs(self, _tarfile, sigmffile_name, set_permission):
+        path_components = sigmffile_name.split(os.path.sep)
+        current_path = ""
+        for path in path_components:
+            current_path = os.path.join(current_path, path)
+            path_found = False
+            for member in _tarfile.getmembers():
+                if member.name == current_path:
+                    path_found = True
+                    break
+            if not path_found:
+                tarinfo = tarfile.TarInfo(current_path)
+                tarinfo.type = tarfile.DIRTYPE
+                tarinfo = set_permission(tarinfo)
+                _tarfile.addfile(tarinfo)
 
     def _check_input(self):
         self._ensure_path_has_correct_extension()

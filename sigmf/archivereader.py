@@ -71,9 +71,7 @@ class SigMFArchiveReader():
                         with tar_obj.extractfile(memb) as memb_fid:
                             json_contents = memb_fid.read()
 
-                        # recording name is the path of folder
-                        # containing data/metadata
-                        sigmffile_name, _ = os.path.split(memb.name)
+                        sigmffile_name, _ = os.path.splitext(memb.name)
                     elif memb.name.endswith(SIGMF_DATASET_EXT):
                         data_offset_size = memb.offset_data, memb.size
                         data_found = True
