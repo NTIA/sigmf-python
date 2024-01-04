@@ -22,6 +22,7 @@ import os
 import shutil
 import tempfile
 import json
+from pathlib import Path
 import numpy as np
 import unittest
 
@@ -34,15 +35,28 @@ from .testdata import *
 
 class TestClassMethods(unittest.TestCase):
     def setUp(self):
-        '''assure tests have a valid SigMF object to work with'''
-        _, temp_path = tempfile.mkstemp()
-        TEST_FLOAT32_DATA_1.tofile(temp_path)
-        self.sigmf_object = SigMFFile("test",
-                                      TEST_METADATA_1,
-                                      data_file=temp_path)
+        """ensure tests have a valid SigMF object to work with"""
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.temp_path_data = self.temp_dir / "trash.sigmf-data"
+        self.temp_path_meta = self.temp_dir / "trash.sigmf-meta"
+        TEST_FLOAT32_DATA.tofile(self.temp_path_data)
+        self.sigmf_object = SigMFFile(TEST_METADATA, data_file=self.temp_path_data)
+        self.sigmf_object.tofile(self.temp_path_meta)
+
+    def tearDown(self):
+        """remove temporary dir"""
+        shutil.rmtree(self.temp_dir)
+
+    def test_pathlib_handle(self):
+        """ensure file can be a string or a pathlib object"""
+        self.assertTrue(self.temp_path_data.exists())
+        obj_str = sigmffile.fromfile(str(self.temp_path_data))
+        obj_str.validate()
+        obj_pth = sigmffile.fromfile(self.temp_path_data)
+        obj_pth.validate()
 
     def test_iterator_basic(self):
-        '''make sure default batch_size works'''
+        """make sure default batch_size works"""
         count = 0
         for _ in self.sigmf_object:
             count += 1
@@ -151,66 +165,68 @@ def test_add_multiple_captures_and_annotations():
         simulate_capture(sigf, idx, 1024)
 
 
-def test_multichannel_types():
-    '''check that real & complex for all types is reading multiple channels correctly'''
-    lut = {
-        'i8': np.int8,
-        'u8': np.uint8,
-        'i16': np.int16,
-        'u16': np.uint16,
-        'u32': np.uint32,
-        'i32': np.int32,
-        'f32': np.float32,
-        'f64': np.float64,
-    }
-    raw_count = 16
-    _, temp_path = tempfile.mkstemp()
-    for key, dtype in lut.items():
-        # for each type of storage
-        np.arange(raw_count, dtype=dtype).tofile(temp_path)
-        for num_channels in [1, 8]:
-            # for single or 8 channel
-            for complex_prefix in ['r', 'c']:
-                # for real or complex
-                check_count = raw_count * 1 # deepcopy
-                temp_signal = SigMFFile(
-                    name="test",
-                    data_file=temp_path,
-                    global_info={
-                        SigMFFile.DATATYPE_KEY: f'{complex_prefix}{key}_le',
-                        SigMFFile.NUM_CHANNELS_KEY: num_channels,
-                    },
-                )
-                temp_samples = temp_signal.read_samples()
+class TestMultichannel(unittest.TestCase):
+    def setUp(self):
+        # in order to check shapes we need some positive number of samples to work with
+        # number of samples should be lowest common factor of num_channels
+        self.raw_count = 16
+        self.lut = {
+            "i8": np.int8,
+            "u8": np.uint8,
+            "i16": np.int16,
+            "u16": np.uint16,
+            "u32": np.uint32,
+            "i32": np.int32,
+            "f32": np.float32,
+            "f64": np.float64,
+        }
 
-                if complex_prefix == 'c':
-                    # complex data will be half as long
-                    check_count //= 2
-                    assert np.all(np.iscomplex(temp_samples))
-                if num_channels != 1:
-                    assert temp_samples.ndim == 2
-                check_count //= num_channels
+    def test_multichannel_types(self):
+        """check that real & complex for all types is reading multiple channels correctly"""
+        _, temp_path = tempfile.mkstemp()
+        for key, dtype in self.lut.items():
+            # for each type of storage
+            np.arange(self.raw_count, dtype=dtype).tofile(temp_path)
+            for num_channels in [1, 4, 8]:
+                # for single or 8 channel
+                for complex_prefix in ["r", "c"]:
+                    # for real or complex
+                    check_count = self.raw_count
+                    temp_signal = SigMFFile(
+                        data_file=temp_path,
+                        global_info={
+                            SigMFFile.DATATYPE_KEY: f"{complex_prefix}{key}_le",
+                            SigMFFile.NUM_CHANNELS_KEY: num_channels,
+                        },
+                    )
+                    temp_samples = temp_signal.read_samples()
 
-                assert check_count == temp_signal._count_samples()
+                    if complex_prefix == "c":
+                        # complex data will be half as long
+                        check_count //= 2
+                        self.assertTrue(np.all(np.iscomplex(temp_samples)))
+                    if num_channels != 1:
+                        self.assertEqual(temp_samples.ndim, 2)
+                    check_count //= num_channels
 
+                    self.assertEqual(check_count, temp_signal._count_samples())
 
-def test_multichannel_seek():
-    '''assure that seeking is working correctly with multichannel files'''
-    _, temp_path = tempfile.mkstemp()
-    # write some dummy data and read back
-    np.arange(18, dtype=np.uint16).tofile(temp_path)
-    temp_signal = SigMFFile(
-        name="test",
-        data_file=temp_path,
-        global_info={
-            SigMFFile.DATATYPE_KEY: 'cu16_le',
-            SigMFFile.NUM_CHANNELS_KEY: 3,
-        },
-    )
-    # read after the first sample
-    temp_samples = temp_signal.read_samples(start_index=1, autoscale=False)
-    # assure samples are in the order we expect
-    assert np.all(temp_samples[:, 0] == np.array([6+7j, 12+13j]))
+    def test_multichannel_seek(self):
+        """assure that seeking is working correctly with multichannel files"""
+        _, temp_path = tempfile.mkstemp()
+        # write some dummy data and read back
+        np.arange(18, dtype=np.uint16).tofile(temp_path)
+        temp_signal = SigMFFile(
+            data_file=temp_path,
+            global_info={
+                SigMFFile.DATATYPE_KEY: "cu16_le",
+                SigMFFile.NUM_CHANNELS_KEY: 3,
+            },
+        )
+        # read after the first sample
+        temp_samples = temp_signal.read_samples(start_index=1, autoscale=False)
+        # assure samples are in the order we expect
+        self.assertTrue(np.all(temp_samples[:, 0] == np.array([6 + 7j, 12 + 13j])))
 
 
 def test_key_validity():
@@ -294,3 +310,28 @@ def test_captures_checking():
     assert (160,224) == sigmf4.get_capture_byte_boundarys(1)
     assert np.array_equal(np.array(range(64)), sigmf4.read_samples_in_capture(0,autoscale=False)[:,0])
     assert np.array_equal(np.array(range(64,96)), sigmf4.read_samples_in_capture(1,autoscale=False)[:,1])
+
+def test_slicing():
+    '''Test __getitem___ builtin for sigmffile, make sure slicing and indexing works as expected.'''
+    _, temp_data0 = tempfile.mkstemp()
+    np.array(TEST_U8_DATA0, dtype=np.uint8).tofile(temp_data0)
+    sigmf0 = SigMFFile(metadata=TEST_U8_META0, data_file=temp_data0)
+    assert np.array_equal(TEST_U8_DATA0, sigmf0[:])
+    assert TEST_U8_DATA0[6] == sigmf0[6]
+
+    # test float32
+    _, temp_data1 = tempfile.mkstemp()
+    np.array(TEST_FLOAT32_DATA, dtype=np.float32).tofile(temp_data1)
+    sigmf1 = SigMFFile(metadata=TEST_METADATA, data_file=temp_data1)
+    assert np.array_equal(TEST_FLOAT32_DATA, sigmf1[:])
+    assert sigmf1[10] == TEST_FLOAT32_DATA[10]
+
+    # test multiple channels
+    _, temp_data2 = tempfile.mkstemp()
+    np.array(TEST_U8_DATA4, dtype=np.uint8).tofile(temp_data2)
+    sigmf2 = SigMFFile(TEST_U8_META4, data_file=temp_data2)
+    channelized = np.array(TEST_U8_DATA4).reshape((128,2))
+    assert np.array_equal(channelized, sigmf2[:][:])
+    assert np.array_equal(sigmf2[10:20, 91:112], sigmf2.read_samples(autoscale=False)[10:20, 91:112])
+    assert np.array_equal(sigmf2[0], channelized[0])
+    assert np.array_equal(sigmf2[1,:], channelized[1,:])

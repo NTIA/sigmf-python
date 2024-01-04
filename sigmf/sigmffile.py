@@ -195,7 +195,6 @@ class SigMFFile(SigMFMetafile):
         if metadata is None:
             self._metadata = {self.GLOBAL_KEY:{}, self.CAPTURE_KEY:[], self.ANNOTATION_KEY:[]}
             self._metadata[self.GLOBAL_KEY][self.NUM_CHANNELS_KEY] = 1
-            self._metadata[self.GLOBAL_KEY][self.VERSION_KEY] = __version__
         elif isinstance(metadata, dict):
             self._metadata = metadata
         else:
@@ -205,6 +204,8 @@ class SigMFFile(SigMFMetafile):
         if data_file is not None:
             self.set_data_file(data_file, skip_checksum=skip_checksum, map_readonly=map_readonly)
         self.name = name
+
+        self._metadata[self.GLOBAL_KEY][self.VERSION_KEY] = '1.0.0'
 
     def __len__(self):
         return self._memmap.shape[0]
@@ -222,18 +223,21 @@ class SigMFFile(SigMFMetafile):
             raise StopIteration
 
     def __getitem__(self, sli):
-        a = self._memmap[sli] # matches behavior of numpy.ndarray.__getitem__()
-        if self._return_type is not None:
-            # is_fixed_point and is_complex
-            if self._memmap.ndim == 2:
-                # num_channels==1
-                a = a[:,0].astype(self._return_type) + 1.j * a[:,1].astype(self._return_type)
-            elif self._memmap.ndim == 3:
-                # num_channels>1
-                a = a[:,:,0].astype(self._return_type) + 1.j * a[:,:,1].astype(self._return_type)
-            else:
-                raise ValueError("unhandled ndim in SigMFFile.__getitem__(); this shouldn't happen")
-        return a
+        mem = self._memmap[sli] # matches behavior of numpy.ndarray.__getitem__()
+        
+        if self._return_type is None:
+            return mem
+
+        # is_fixed_point and is_complex
+        if self._memmap.ndim == 2:
+            # num_channels == 1
+            ray = mem[:,0].astype(self._return_type) + 1.j * mem[:,1].astype(self._return_type)
+        elif self._memmap.ndim == 3:
+            # num_channels > 1
+            ray = mem[:,:,0].astype(self._return_type) + 1.j * mem[:,:,1].astype(self._return_type)
+        else:
+            raise ValueError("unhandled ndim in SigMFFile.__getitem__(); this shouldn't happen")
+        return ray[0] if type(sli) is int else ray # return element instead of 1-element array
 
     def __eq__(self, other):
         """Define equality between two `SigMFFile`s.
@@ -730,7 +734,6 @@ class SigMFCollection(SigMFMetafile):
 
         if metadata is None:
             self._metadata = {self.COLLECTION_KEY:{}}
-            self._metadata[self.COLLECTION_KEY][self.VERSION_KEY] = __version__
             self._metadata[self.COLLECTION_KEY][self.STREAMS_KEY] = []
         else:
             self._metadata = metadata
@@ -742,6 +745,8 @@ class SigMFCollection(SigMFMetafile):
 
         if not self.skip_checksums:
             self.verify_stream_hashes()
+
+        self._metadata[self.COLLECTION_KEY][self.VERSION_KEY] = '1.0.0'
 
     def __len__(self):
         '''
@@ -988,10 +993,13 @@ def fromfile(filename, skip_checksum=False):
     archive_fn = fns['archive_fn']
     collection_fn = fns['collection_fn']
 
-    if (filename.lower().endswith(SIGMF_ARCHIVE_EXT) or not path.isfile(meta_fn)) and path.isfile(archive_fn):
+    # extract the extension to check whether we are dealing with an archive, collection, etc.
+    file_path, ext = path.splitext(filename) # works with Pathlib - ext contains a dot
+
+    if (ext.lower().endswith(SIGMF_ARCHIVE_EXT) or not path.isfile(meta_fn)) and path.isfile(archive_fn):
         return fromarchive(archive_fn)
 
-    if (filename.lower().endswith(SIGMF_COLLECTION_EXT) or not path.isfile(meta_fn)) and path.isfile(collection_fn):
+    if (ext.lower().endswith(SIGMF_COLLECTION_EXT) or not path.isfile(meta_fn)) and path.isfile(collection_fn):
         collection_fp = open(collection_fn, "rb")
         bytestream_reader = codecs.getreader("utf-8")
         mdfile_reader = bytestream_reader(collection_fp)

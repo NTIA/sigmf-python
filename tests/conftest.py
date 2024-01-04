@@ -34,6 +34,7 @@ from .testdata import (TEST_FLOAT32_DATA_1,
 
 @pytest.fixture
 def test_data_file_1():
+    """when called, yields temporary file"""
     with tempfile.NamedTemporaryFile() as temp:
         TEST_FLOAT32_DATA_1.tofile(temp.name)
         yield temp
@@ -41,6 +42,7 @@ def test_data_file_1():
 
 @pytest.fixture
 def test_data_file_2():
+    """when called, yields temporary file"""
     with tempfile.NamedTemporaryFile() as t:
         TEST_FLOAT32_DATA_2.tofile(t.name)
         yield t
@@ -48,6 +50,7 @@ def test_data_file_2():
 
 @pytest.fixture
 def test_data_file_3():
+    """when called, yields temporary file"""
     with tempfile.NamedTemporaryFile() as t:
         TEST_FLOAT32_DATA_3.tofile(t.name)
         yield t
@@ -55,6 +58,7 @@ def test_data_file_3():
 
 @pytest.fixture
 def test_sigmffile(test_data_file_1):
+    """If pytest uses this signature, will return valid SigMF file."""
     f = SigMFFile(name='test1')
     f.set_global_field("core:datatype", "rf32_le")
     f.add_annotation(start_index=0, length=len(TEST_FLOAT32_DATA_1))
@@ -66,6 +70,7 @@ def test_sigmffile(test_data_file_1):
 
 @pytest.fixture
 def test_alternate_sigmffile(test_data_file_2):
+    """If pytest uses this signature, will return valid SigMF file."""
     f = SigMFFile(name='test2')
     f.set_global_field("core:datatype", "rf32_le")
     f.add_annotation(start_index=0, length=len(TEST_FLOAT32_DATA_2))
@@ -77,6 +82,7 @@ def test_alternate_sigmffile(test_data_file_2):
 
 @pytest.fixture
 def test_alternate_sigmffile_2(test_data_file_3):
+    """If pytest uses this signature, will return valid SigMF file."""
     f = SigMFFile(name='test3')
     f.set_global_field("core:datatype", "rf32_le")
     f.add_annotation(start_index=0, length=len(TEST_FLOAT32_DATA_3))
