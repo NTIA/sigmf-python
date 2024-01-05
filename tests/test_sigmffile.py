@@ -39,8 +39,8 @@ class TestClassMethods(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp())
         self.temp_path_data = self.temp_dir / "trash.sigmf-data"
         self.temp_path_meta = self.temp_dir / "trash.sigmf-meta"
-        TEST_FLOAT32_DATA.tofile(self.temp_path_data)
-        self.sigmf_object = SigMFFile(TEST_METADATA, data_file=self.temp_path_data)
+        TEST_FLOAT32_DATA_1.tofile(self.temp_path_data)
+        self.sigmf_object = SigMFFile(name="test", metadata=TEST_METADATA_1, data_file=self.temp_path_data)
         self.sigmf_object.tofile(self.temp_path_meta)
 
     def tearDown(self):
@@ -193,6 +193,7 @@ class TestMultichannel(unittest.TestCase):
                     # for real or complex
                     check_count = self.raw_count
                     temp_signal = SigMFFile(
+                        name="test",
                         data_file=temp_path,
                         global_info={
                             SigMFFile.DATATYPE_KEY: f"{complex_prefix}{key}_le",
@@ -217,6 +218,7 @@ class TestMultichannel(unittest.TestCase):
         # write some dummy data and read back
         np.arange(18, dtype=np.uint16).tofile(temp_path)
         temp_signal = SigMFFile(
+            name="test",
             data_file=temp_path,
             global_info={
                 SigMFFile.DATATYPE_KEY: "cu16_le",
@@ -315,21 +317,21 @@ def test_slicing():
     '''Test __getitem___ builtin for sigmffile, make sure slicing and indexing works as expected.'''
     _, temp_data0 = tempfile.mkstemp()
     np.array(TEST_U8_DATA0, dtype=np.uint8).tofile(temp_data0)
-    sigmf0 = SigMFFile(metadata=TEST_U8_META0, data_file=temp_data0)
+    sigmf0 = SigMFFile("test1", metadata=TEST_U8_META0, data_file=temp_data0)
     assert np.array_equal(TEST_U8_DATA0, sigmf0[:])
     assert TEST_U8_DATA0[6] == sigmf0[6]
 
     # test float32
     _, temp_data1 = tempfile.mkstemp()
-    np.array(TEST_FLOAT32_DATA, dtype=np.float32).tofile(temp_data1)
-    sigmf1 = SigMFFile(metadata=TEST_METADATA, data_file=temp_data1)
-    assert np.array_equal(TEST_FLOAT32_DATA, sigmf1[:])
-    assert sigmf1[10] == TEST_FLOAT32_DATA[10]
+    np.array(TEST_FLOAT32_DATA_1, dtype=np.float32).tofile(temp_data1)
+    sigmf1 = SigMFFile("test2", metadata=TEST_METADATA_1, data_file=temp_data1)
+    assert np.array_equal(TEST_FLOAT32_DATA_1, sigmf1[:])
+    assert sigmf1[10] == TEST_FLOAT32_DATA_1[10]
 
     # test multiple channels
     _, temp_data2 = tempfile.mkstemp()
     np.array(TEST_U8_DATA4, dtype=np.uint8).tofile(temp_data2)
-    sigmf2 = SigMFFile(TEST_U8_META4, data_file=temp_data2)
+    sigmf2 = SigMFFile("test3", TEST_U8_META4, data_file=temp_data2)
     channelized = np.array(TEST_U8_DATA4).reshape((128,2))
     assert np.array_equal(channelized, sigmf2[:][:])
     assert np.array_equal(sigmf2[10:20, 91:112], sigmf2.read_samples(autoscale=False)[10:20, 91:112])
