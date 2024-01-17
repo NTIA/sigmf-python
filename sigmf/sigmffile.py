@@ -13,8 +13,9 @@ from os import path
 import warnings
 import numpy as np
 
-from . import __version__, schema, sigmf_hash, validate
+from . import schema, sigmf_hash, validate
 from .archive import SigMFArchive, SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT, SIGMF_COLLECTION_EXT
+from .sigmffile_collection import AbstractSigMFFileCollection, SigMFFileCollection
 from .utils import dict_merge
 from .error import SigMFFileError, SigMFAccessError
 
@@ -98,7 +99,8 @@ class SigMFMetafile():
             separators=(',', ': ') if pretty else None,
         ) + "\n"
 
-class SigMFFile(SigMFMetafile):
+
+class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
     START_INDEX_KEY = "core:sample_start"
     LENGTH_INDEX_KEY = "core:sample_count"
     GLOBAL_INDEX_KEY = "core:global_index"
@@ -551,31 +553,31 @@ class SigMFFile(SigMFMetafile):
         version = self.get_global_field(self.VERSION_KEY)
         validate.validate(self._metadata, self.get_schema())
 
-    def archive(self, file_path=None, fileobj=None, pretty=True):
+    def archive(self, name=None, fileobj=None, pretty=True):
         """Dump contents to SigMF archive format.
 
         Keyword arguments:
-        file_path -- passed to SigMFArchive`path`. Path to archive file to
-                     create. If file exists, overwrite. If `path` doesn't end
-                     in .sigmf, it will be appended. If not given, `file_path`
+        name      -- passed to SigMFArchive `path`. Path to archive file to
+                     create. If file exists, overwrite. If `name` doesn't end
+                     in .sigmf, it will be appended. If not given, `name`
                      will be set to self.name. (default None)
         fileobj   -- passed to SigMFArchive `fileobj`. If `fileobj` is
                      specified, it is used as an alternative to a file object
-                     opened in binary mode for `file_path`. If `fileobj` is an
+                     opened in binary mode for `name`. If `fileobj` is an
                      open tarfile, it will be appended to. It is supposed to
                      be at position 0. `fileobj` won't be closed. If `fileobj`
-                     is given, `file_path` has no effect. (default None)
+                     is given, `name` has no effect. (default None)
         pretty    -- passed to SigMFArchive `pretty`. If True, pretty print
                      JSON when creating the metadata and collection files in
                      the archive. (default True).
 
         Returns the path to the created archive.
         """
-        if file_path is None:
-            file_path = self.name
+        if name is None:
+            name = self.name
 
         archive = SigMFArchive(self,
-                               path=file_path,
+                               path=name,
                                fileobj=fileobj,
                                pretty=pretty)
         return archive.path
@@ -700,6 +702,13 @@ class SigMFFile(SigMFMetafile):
 
         fp.close()
         return data
+
+    def sigmffile_count(self):
+        # This class always represents a single SigMF metadata/data file combination
+        return 1
+
+    def get_sigmffiles(self):
+        return [self]
 
 
 class SigMFCollection(SigMFMetafile):
@@ -949,12 +958,16 @@ def get_dataset_filename_from_metadata(meta_fn, metadata=None):
     return None
 
 
-def fromarchive(archive_path):
-    """Extract an archive and return containing SigMFFiles.
+def fromarchive(archive_path, dir=None) -> AbstractSigMFFileCollection:
+    """Extract an archive and return AbstractSigMFFileCollection (either
+    a SigMFFile or a SigMFFileCollection).
 
     If the archive contains a single recording, a single SigMFFile object will
-    be returned. If the archive contains multiple recordings a list of
-    SigMFFile objects will be returned.
+    be returned. If the archive contains multiple recordings a
+    SigMFFileCollection will be returned.
+
+    The `dir` parameter is no longer used as this function has been changed to
+    access SigMF archives without extracting them.
     """
     from .archivereader import SigMFArchiveReader
     reader = SigMFArchiveReader(archive_path)
@@ -963,15 +976,15 @@ def fromarchive(archive_path):
     if len(sigmffiles) == 1:
         ret = sigmffiles[0]
     else:
-        ret = sigmffiles
+        ret = SigMFFileCollection(sigmffiles)
 
     return ret
 
 
 def fromfile(filename, skip_checksum=False):
     '''
-    Creates and returns a SigMFFile or SigMFCollection instance with metadata
-    loaded from the specified file. The filename may be that of either a
+    Creates and returns AbstractSigMFFileCollection (either a SigMFFile or a SigMFFileCollection) or SigMFCollection
+    instance with metadata loaded from the specified file. The filename may be that of either a
     sigmf-meta file, a sigmf-data file, a sigmf-collection file, or a sigmf
     archive.
 

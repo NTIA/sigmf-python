@@ -6,13 +6,11 @@
 
 """Create and extract SigMF archives."""
 
-import collections
 from io import BytesIO
 import os
 import tarfile
-import tempfile
 import time
-from typing import BinaryIO, Iterable, Union
+from typing import BinaryIO, Union
 
 import sigmf
 
@@ -55,8 +53,7 @@ class SigMFArchive():
                     files in the archive. Defaults to True.
     """
     def __init__(self,
-                 sigmffiles: Union["sigmf.sigmffile.SigMFFile",
-                                   Iterable["sigmf.sigmffile.SigMFFile"]],
+                 sigmffile_collection: 'sigmf.sigmffile_collection.AbstractSigMFFileCollection',
                  path: Union[str, os.PathLike] = None,
                  fileobj: BinaryIO = None,
                  pretty: bool = True):
@@ -65,15 +62,7 @@ class SigMFArchive():
             raise SigMFFileError("'path' or 'fileobj' required for creating "
                                  "SigMF archive!")
 
-        if isinstance(sigmffiles, sigmf.sigmffile.SigMFFile):
-            self.sigmffiles = [sigmffiles]
-        elif (hasattr(collections, "Iterable") and
-              isinstance(sigmffiles, collections.Iterable)):
-            self.sigmffiles = sigmffiles
-        elif isinstance(sigmffiles, collections.abc.Iterable):  # python 3.10
-            self.sigmffiles = sigmffiles
-        else:
-            raise SigMFFileError("Unknown type for sigmffiles argument!")
+        self.sigmffiles = sigmffile_collection.get_sigmffiles()
 
         if path:
             self.path = str(path)

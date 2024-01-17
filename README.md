@@ -56,15 +56,16 @@ from sigmf.archivereader import SigMFArchiveReader
 from sigmf.sigmffile import (fromarchive,
                              fromfile)
 
-# read multirecording archive using fromarchive
-sigmffiles = fromarchive("multi_recording_archive.sigmf")
+# read multirecording archive using fromarchive_multirecording
+sigmffile_collection = fromarchive("multi_recording_archive.sigmf")
 # length should be equal to the number of recordings in the archive
-print(len(sigmffiles))  
+print(sigmffile_collection.sigmffile_count())  
 
 # read multirecording archive using fromfile
-sigmffiles = fromfile("multi_recording_archive.sigmf")
+sigmffile_collection = fromfile("multi_recording_archive.sigmf")
 # length should be equal to the number of recordings in the archive
-print(len(sigmffiles))
+print(sigmffile_collection.sigmffile_count())
+sigmffile_collection.get_sigmffiles() # get sigmf files
 
 # read multirecording archive using SigMFArchiveReader
 reader = SigMFArchiveReader("multi_recording_archive.sigmf")
@@ -229,11 +230,11 @@ sigmf_file.add_capture(start_index=0)
 sigmf_file.set_data_file(data_path)
 
 # create archive using SigMFArchive
-archive = SigMFArchive(sigmffiles=sigmf_file,
+archive = SigMFArchive(sigmffile_collection=sigmf_file,
                         path="single_recording_archive1.sigmf")
 
 # create archive using SigMFFile archive()
-archive_path = sigmf_file.archive(file_path="single_recording_archive2.sigmf")
+archive_path = sigmf_file.archive(name="single_recording_archive2.sigmf")
 
 # create archive using tofile
 sigmf_file.tofile(file_path="single_recording_archive3.sigmf",
@@ -248,6 +249,7 @@ import numpy as np
 
 from sigmf.sigmffile import (SigMFFile,
                              SigMFArchive)
+from sigmf.sigmffile_collection import SigMFFileCollection
 
 
 # create data files
@@ -272,10 +274,12 @@ sigmf_file_2.add_annotation(start_index=0, length=len(random_data2))
 sigmf_file_2.add_capture(start_index=0)
 sigmf_file_2.set_data_file(data2_path)
 
+# create archive using SigMFFileCollection
+sigmffile_collection = SigMFFileCollection([sigmf_file_1, sigmf_file_2])
+sigmffile_collection.archive(name="multi_recording_archive.sigmf")
 
 # create archive using SigMFArchive
-sigmffiles = [sigmf_file_1, sigmf_file_2]
-archive = SigMFArchive(sigmffiles=sigmffiles,
+archive = SigMFArchive(sigmffile_collection=sigmffile_collection,
                         path="multi_recording_archive.sigmf")
 ```
 

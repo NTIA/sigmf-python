@@ -29,6 +29,7 @@ import unittest
 from sigmf import sigmffile, utils
 from sigmf.sigmffile import SigMFFile, fromarchive
 from sigmf.archive import SigMFArchive
+from sigmf.sigmffile_collection import SigMFFileCollection
 
 from .testdata import *
 
@@ -114,7 +115,7 @@ def test_add_annotation_with_duplicate_key():
 def test_fromarchive(test_sigmffile):
     print("test_sigmffile is:\n", test_sigmffile)
     tf = tempfile.mkstemp()[1]
-    archive_path = test_sigmffile.archive(file_path=tf)
+    archive_path = test_sigmffile.archive(name=tf)
     result = sigmffile.fromarchive(archive_path=archive_path)
     assert result == test_sigmffile
     os.remove(tf)
@@ -127,30 +128,34 @@ def test_fromarchive_multi_recording(test_sigmffile,
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
         test_sigmffile.archive(fileobj=t_file)
-        single_sigmffile = fromarchive(path)
-        assert isinstance(single_sigmffile, SigMFFile)
-        assert single_sigmffile == test_sigmffile
+        sigmffile_collection = fromarchive(path)
+        assert sigmffile_collection.sigmffile_count() == 1
+        assert isinstance(sigmffile_collection, SigMFFile)
+        assert sigmffile_collection == test_sigmffile
 
     # 2 recordings
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
-        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         SigMFArchive(input_sigmffiles, fileobj=t_file)
-        sigmffile_one, sigmffile_two = fromarchive(path)
-        assert isinstance(sigmffile_one, SigMFFile)
-        assert sigmffile_one == test_sigmffile
-        assert isinstance(sigmffile_two, SigMFFile)
-        assert sigmffile_two == test_alternate_sigmffile
+        sigmffile_collection = fromarchive(path)
+        assert sigmffile_collection.sigmffile_count() == 2
+        sigmffiles = sigmffile_collection.get_sigmffiles()
+        assert isinstance(sigmffiles[0], SigMFFile)
+        assert sigmffiles[0] == test_sigmffile
+        assert isinstance(sigmffiles[1], SigMFFile)
+        assert sigmffiles[1] == test_alternate_sigmffile
 
     # 3 recordings
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t_file:
         path = t_file.name
-        input_sigmffiles = [test_sigmffile,
-                            test_alternate_sigmffile,
-                            test_alternate_sigmffile_2]
+        input_sigmffiles = SigMFFileCollection([test_sigmffile,
+                                                test_alternate_sigmffile,
+                                                test_alternate_sigmffile_2])
         SigMFArchive(input_sigmffiles, fileobj=t_file)
-        list_of_sigmffiles = fromarchive(path)
-        assert len(list_of_sigmffiles) == 3
+        sigmffile_collection = fromarchive(path)
+        assert sigmffile_collection.sigmffile_count() == 3
+        list_of_sigmffiles = sigmffile_collection.get_sigmffiles()
         assert isinstance(list_of_sigmffiles[0], SigMFFile)
         assert list_of_sigmffiles[0] == test_sigmffile
         assert isinstance(list_of_sigmffiles[1], SigMFFile)

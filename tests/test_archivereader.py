@@ -8,6 +8,7 @@ import unittest
 
 from sigmf import SigMFFile, SigMFArchiveReader
 from sigmf.archive import SIGMF_METADATA_EXT, SigMFArchive
+from sigmf.sigmffile_collection import SigMFFileCollection
 
 
 class TestArchiveReader(unittest.TestCase):
@@ -93,11 +94,11 @@ def test_extract_single_recording(test_sigmffile):
 def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as tf:
         # Create a multi-recording archive
-        expected_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        expected_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(expected_sigmffiles, path=tf.name)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 2
-        for expected in expected_sigmffiles:
+        for expected in expected_sigmffiles.get_sigmffiles():
             assert expected in reader.sigmffiles
 
 
@@ -117,12 +118,12 @@ def test_archivereader_different_folder(test_sigmffile,
 
         os.makedirs("archive_folder", exist_ok=True)
         archive_path = os.path.join("archive_folder", "test_archive.sigmf")
-        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(input_sigmffiles, path=archive_path)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 2  # number of SigMFFiles
         for actual_sigmffile in reader:
-            assert actual_sigmffile in input_sigmffiles
+            assert actual_sigmffile in input_sigmffiles.get_sigmffiles()
     finally:
         if os.path.exists(meta1_filepath):
             os.remove(meta1_filepath)
@@ -151,12 +152,12 @@ def test_archivereader_same_folder(test_sigmffile,
         with open(meta2_filepath, "w") as meta_fd:
             test_alternate_sigmffile.dump(meta_fd)
         archive_path = os.path.join("folder1", "test_archive.sigmf")
-        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(input_sigmffiles, path=archive_path)
         reader = SigMFArchiveReader(arch.path)
         assert len(reader) == 2  # number of SigMFFiles
         for actual_sigmffile in reader:
-            assert actual_sigmffile in input_sigmffiles
+            assert actual_sigmffile in input_sigmffiles.get_sigmffiles()
     finally:
         if os.path.exists(meta1_filepath):
             os.remove(meta1_filepath)

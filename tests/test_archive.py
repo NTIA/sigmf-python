@@ -15,6 +15,7 @@ from sigmf.archive import (SIGMF_DATASET_EXT,
                            SIGMF_METADATA_EXT,
                            SigMFArchive)
 from sigmf.archivereader import SigMFArchiveReader
+from sigmf.sigmffile_collection import SigMFFileCollection
 
 from .testdata import TEST_FLOAT32_DATA_1, TEST_METADATA_1
 
@@ -29,20 +30,20 @@ def test_without_data_file_throws_fileerror(test_sigmffile):
     test_sigmffile.data_file = None
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(error.SigMFFileError):
-            test_sigmffile.archive(file_path=temp.name)
+            test_sigmffile.archive(name=temp.name)
 
 
 def test_invalid_md_throws_validationerror(test_sigmffile):
     del test_sigmffile._metadata["global"]["core:datatype"]  # required field
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(jsonschema.exceptions.ValidationError):
-            test_sigmffile.archive(file_path=temp.name)
+            test_sigmffile.archive(name=temp.name)
 
 
 def test_name_wrong_extension_throws_fileerror(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
         with pytest.raises(error.SigMFFileError):
-            test_sigmffile.archive(file_path=temp.name + ".zip")
+            test_sigmffile.archive(name=temp.name + ".zip")
 
 
 def test_fileobj_extension_ignored(test_sigmffile):
@@ -52,7 +53,7 @@ def test_fileobj_extension_ignored(test_sigmffile):
 
 def test_name_used_in_fileobj(test_sigmffile):
     with tempfile.NamedTemporaryFile() as temp:
-        sigmf_archive = test_sigmffile.archive(file_path="testarchive",
+        sigmf_archive = test_sigmffile.archive(name="testarchive",
                                                fileobj=temp)
         sigmf_tarfile = tarfile.open(sigmf_archive, mode="r")
         basedir, file1, file2 = sigmf_tarfile.getmembers()
@@ -84,7 +85,7 @@ def test_unwritable_name_throws_fileerror(test_sigmffile):
     # so use invalid filename
     unwritable_file = '/bad_name/'
     with pytest.raises(error.SigMFFileError):
-        test_sigmffile.archive(file_path=unwritable_file)
+        test_sigmffile.archive(name=unwritable_file)
 
 
 def test_tarfile_layout(test_sigmffile):
@@ -193,16 +194,16 @@ def test_tarfile_type(test_sigmffile):
 
 def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
     with tempfile.NamedTemporaryFile() as t:
-        input_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+        input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(input_sigmffiles, path=Path(t.name))
-        output_sigmf_files = sigmffile.fromarchive(archive_path=arch.path)
-        assert len(output_sigmf_files) == 2
-        assert input_sigmffiles == output_sigmf_files
+        output_sigmf_collection = sigmffile.fromarchive(archive_path=arch.path)
+        assert output_sigmf_collection.sigmffile_count() == 2
+        assert input_sigmffiles.get_sigmffiles() == output_sigmf_collection.get_sigmffiles()
 
 
 def test_archive_names(test_sigmffile):
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
-        a = SigMFArchive(sigmffiles=test_sigmffile, path=t.name)
+        a = SigMFArchive(sigmffile_collection=test_sigmffile, path=t.name)
         assert a.path == t.name
         observed_sigmffile = sigmffile.fromarchive(t.name)
         observed_sigmffile.name == test_sigmffile.name
@@ -261,17 +262,17 @@ def test_create_archive_from_archive_reader(test_sigmffile,
     """ This test is to ensure that SigMFArchive will correctly create archive
     using SigMFFile offset_and_size which is set when using SigMFArchiveReader
     """
-    original_sigmffiles = [test_sigmffile, test_alternate_sigmffile]
+    original_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
     with tempfile.TemporaryDirectory() as temp_dir:
         archive_path1 = os.path.join(temp_dir, "original_archive.sigmf")
-        SigMFArchive(sigmffiles=original_sigmffiles, path=archive_path1)
+        SigMFArchive(sigmffile_collection=original_sigmffiles, path=archive_path1)
         reader = SigMFArchiveReader(path=archive_path1)
         archive_path2 = os.path.join(temp_dir, "archive_from_reader.sigmf")
-        SigMFArchive(sigmffiles=reader.sigmffiles, path=archive_path2)
+        SigMFArchive(sigmffile_collection=SigMFFileCollection(reader.sigmffiles), path=archive_path2)
         read_archive_from_reader = SigMFArchiveReader(path=archive_path2)
         # SigMFFile.__eq__() method will check metadata
         # which includes datafile hash
-        assert original_sigmffiles == read_archive_from_reader.sigmffiles
+        assert original_sigmffiles.get_sigmffiles() == read_archive_from_reader.sigmffiles
         observed_sigmffile0 = read_archive_from_reader.sigmffiles[0]
         observed_sigmffile1 = read_archive_from_reader.sigmffiles[1]
         assert test_sigmffile.name == observed_sigmffile0.name
