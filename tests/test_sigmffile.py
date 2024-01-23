@@ -68,7 +68,7 @@ class TestAnnotationHandling(unittest.TestCase):
 
     def test_get_annotations_with_index(self):
         """Test that only annotations containing index are returned from get_annotations()"""
-        smf = SigMFFile(copy.deepcopy(TEST_METADATA))
+        smf = SigMFFile("test", copy.deepcopy(TEST_METADATA_1))
         smf.add_annotation(start_index=1)
         smf.add_annotation(start_index=4, length=4)
         annotations_idx10 = smf.get_annotations(index=10)
@@ -82,7 +82,7 @@ class TestAnnotationHandling(unittest.TestCase):
     
     def test__count_samples_from_annotation(self):
         """Make sure sample count from annotations use correct end index"""
-        smf = SigMFFile(copy.deepcopy(TEST_METADATA))
+        smf = SigMFFile("test", copy.deepcopy(TEST_METADATA_1))
         smf.add_annotation(start_index=0, length=32)
         smf.add_annotation(start_index=4, length=4)
         sample_count = smf._count_samples()
@@ -93,11 +93,11 @@ class TestAnnotationHandling(unittest.TestCase):
         Make sure setting data_file with no annotations registered does not
         raise any errors
         """
-        smf = SigMFFile(copy.deepcopy(TEST_METADATA))
+        smf = SigMFFile("test", copy.deepcopy(TEST_METADATA_1))
         smf._metadata[SigMFFile.ANNOTATION_KEY].clear()
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_path_data = os.path.join(tmpdir, "datafile")
-            TEST_FLOAT32_DATA.tofile(temp_path_data)
+            TEST_FLOAT32_DATA_1.tofile(temp_path_data)
             smf.set_data_file(temp_path_data)
             samples = smf.read_samples()
             self.assertTrue(len(samples)==16)
@@ -108,11 +108,11 @@ class TestAnnotationHandling(unittest.TestCase):
         count from data_file and issue a warning if annotations have end
         indices bigger than file end index
         """
-        smf = SigMFFile(copy.deepcopy(TEST_METADATA))
+        smf = SigMFFile("test", copy.deepcopy(TEST_METADATA_1))
         smf.add_annotation(start_index=0, length=32)
         with tempfile.TemporaryDirectory() as tmpdir:
             temp_path_data = os.path.join(tmpdir, "datafile")
-            TEST_FLOAT32_DATA.tofile(temp_path_data)
+            TEST_FLOAT32_DATA_1.tofile(temp_path_data)
             with self.assertWarns(Warning):
                 # Issues warning since file ends before the final annotatio
                 smf.set_data_file(temp_path_data)

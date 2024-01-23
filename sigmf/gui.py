@@ -401,7 +401,7 @@ def main():
     capture_data_input = CaptureData()
     capture_text_blocks = {}
     window_text_blocks = {}
-    f = SigMFFile()
+    f = SigMFFile("generic_name")
     capture_selector_dict = {}
 
     layout = [[Text('This is the SigMF tool to archive RF datasets', size=(80, 1))],

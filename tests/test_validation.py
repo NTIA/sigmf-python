@@ -44,19 +44,19 @@ class FailingCases(unittest.TestCase):
         '''no extra keys allowed on the top level'''
         self.metadata['extra'] = 0
         with self.assertRaises(ValidationError):
-            SigMFFile(self.metadata).validate()
+            SigMFFile("test", self.metadata).validate()
 
     def test_invalid_label(self):
         '''label must be less than 20 chars'''
         self.metadata[SigMFFile.ANNOTATION_KEY][0][SigMFFile.LABEL_KEY] = 'a' * 21
         with self.assertRaises(ValidationError):
-            SigMFFile(self.metadata).validate()
+            SigMFFile("test", self.metadata).validate()
 
     def test_invalid_type(self):
         '''license key must be string'''
         self.metadata[SigMFFile.GLOBAL_KEY][SigMFFile.LICENSE_KEY] = 1
         with self.assertRaises(ValidationError):
-            SigMFFile(self.metadata).validate()
+            SigMFFile("test", self.metadata).validate()
 
     def test_invalid_capture_order(self):
         '''metadata must have captures in order'''
@@ -65,7 +65,7 @@ class FailingCases(unittest.TestCase):
             {SigMFFile.START_INDEX_KEY: 9}
         ]
         with self.assertRaises(ValidationError):
-            SigMFFile(self.metadata).validate()
+            SigMFFile("test", self.metadata).validate()
 
     def test_invalid_annotation_order(self):
         '''metadata must have annotations in order'''
@@ -80,7 +80,7 @@ class FailingCases(unittest.TestCase):
             }
         ]
         with self.assertRaises(ValidationError):
-            SigMFFile(self.metadata).validate()
+            SigMFFile("test", self.metadata).validate()
 
     def test_annotation_without_sample_count(self):
         '''annotation without length should be accepted'''
@@ -89,7 +89,7 @@ class FailingCases(unittest.TestCase):
                 SigMFFile.START_INDEX_KEY: 2
             }
         ]
-        SigMFFile(self.metadata).validate()
+        SigMFFile("test", self.metadata).validate()
 
 
     def test_invalid_hash(self):

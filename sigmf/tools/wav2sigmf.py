@@ -41,7 +41,9 @@ def writeSigMFArchiveFromWave(input_wav_filename, archive_filename=None, start_d
     sigmf_data_path = os.path.join(tmpdir, sigmf_data_filename)
     wav_data.tofile(sigmf_data_path)
 
-    meta = sigmf.SigMFFile(data_file=sigmf_data_path, global_info=global_info)
+    meta = sigmf.SigMFFile(name=os.path.basename(input_wav_filename),
+                           data_file=sigmf_data_path,
+                           global_info=global_info)
     meta.add_capture(0, metadata=capture_info)
 
     if archive_filename is None:
