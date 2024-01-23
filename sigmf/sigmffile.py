@@ -406,15 +406,17 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
             end_byte += (self.get_capture_start(index+1) - self.get_capture_start(index)) * self.get_sample_size() * self.get_num_channels()
         return (start_byte, end_byte)
 
-    def add_annotation(self, start_index, length, metadata=None):
+    def add_annotation(self, start_index, length=None, metadata=None):
         """
-        Insert annotation at start_index with length.
+        Insert annotation at start_index with length (if != None).
         """
         assert start_index >= self._get_start_offset()
-        assert length >= 1
+
         new_annot = metadata or {}
         new_annot[self.START_INDEX_KEY] = start_index
-        new_annot[self.LENGTH_INDEX_KEY] = length
+        if length is not None:
+            assert length >= 1
+            new_annot[self.LENGTH_INDEX_KEY] = length
 
         self._metadata[self.ANNOTATION_KEY] += [new_annot]
         # sort annotations by start_index
@@ -438,11 +440,23 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
         list of dict
             Each dictionary contains one annotation for the sample at `index`.
         '''
-        return [
-            x for x in self._metadata.get(self.ANNOTATION_KEY, [])
-            if index is None or (x[self.START_INDEX_KEY] <= index
-            and x[self.START_INDEX_KEY] + x[self.LENGTH_INDEX_KEY] > index)
-        ]
+        annotations = self._metadata.get(self.ANNOTATION_KEY, [])
+        if index is None:
+            return annotations
+        
+        annotations_including_index = []
+        for annotation in annotations:
+            if index < annotation[self.START_INDEX_KEY]:
+                # index is before annotation starts -> skip
+                continue
+            if self.LENGTH_INDEX_KEY in annotation:
+                # Annotation includes sample_count -> check end index
+                if index >= annotation[self.START_INDEX_KEY] + annotation[self.LENGTH_INDEX_KEY]:
+                    # index is after annotation end -> skip
+                    continue
+            
+            annotations_including_index.append(annotation)
+        return annotations_including_index
 
     def get_sample_size(self):
         """
@@ -454,16 +468,13 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
     def _count_samples(self):
         """
         Count, set, and return the total number of samples in the data file.
-        If there is no data file but there are annotations, use the end index
-        of the final annotation instead. If there are no annotations, use 0.
+        If there is no data file but there are annotations, use the sample_count
+        from the annotation with the highest end index. If there are no annotations,
+        use 0.
         For complex data, a 'sample' includes both the real and imaginary part.
         """
-        annotations = self.get_annotations()
         if self.data_file is None:
-            if len(annotations) > 0:
-                sample_count = annotations[-1][self.START_INDEX_KEY] + annotations[-1][self.LENGTH_INDEX_KEY]
-            else:
-                sample_count = 0
+            sample_count = self._get_sample_count_from_annotations()
         else:
             header_bytes = sum([c.get(self.HEADER_BYTES_KEY, 0) for c in self.get_captures()])
             file_size = path.getsize(self.data_file) if self.offset_and_size is None else self.offset_and_size[1]
@@ -474,11 +485,31 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
             if file_data_size % (sample_size * num_channels) != 0:
                 warnings.warn(f'File `{self.data_file}` does not contain an integer '
                     'number of samples across channels. It may be invalid data.')
-            if len(annotations) > 0 and annotations[-1][self.START_INDEX_KEY] + annotations[-1][self.LENGTH_INDEX_KEY] > sample_count:
+            if self._get_sample_count_from_annotations() > sample_count:
                 warnings.warn(f'File `{self.data_file}` ends before the final annotation '
                     'in the corresponding SigMF metadata.')
         self.sample_count = sample_count
         return sample_count
+
+    def _get_sample_count_from_annotations(self):
+        """
+        Returns the number of samples based on annotation with highest end index.
+        NOTE: Annotations are ordered by START_INDEX_KEY and not end index, so we
+        need to go through all annotations
+        """
+        annon_sample_count = []
+        for annon in self.get_annotations():
+            if self.LENGTH_INDEX_KEY in annon:
+                # Annotation with sample_count
+                annon_sample_count.append(annon[self.START_INDEX_KEY] + annon[self.LENGTH_INDEX_KEY])
+            else:
+                # Annotation without sample_count - sample count must be at least sample_start
+                annon_sample_count.append(annon[self.START_INDEX_KEY])
+
+        if annon_sample_count:
+            return max(annon_sample_count)
+        else:
+            return 0
 
     def calculate_hash(self):
         """

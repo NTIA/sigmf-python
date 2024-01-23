@@ -82,6 +82,16 @@ class FailingCases(unittest.TestCase):
         with self.assertRaises(ValidationError):
             SigMFFile(self.metadata).validate()
 
+    def test_annotation_without_sample_count(self):
+        '''annotation without length should be accepted'''
+        self.metadata[SigMFFile.ANNOTATION_KEY] = [
+            {
+                SigMFFile.START_INDEX_KEY: 2
+            }
+        ]
+        SigMFFile(self.metadata).validate()
+
+
     def test_invalid_hash(self):
         _, temp_path = tempfile.mkstemp()
         TEST_FLOAT32_DATA_1.tofile(temp_path)
