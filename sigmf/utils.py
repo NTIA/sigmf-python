@@ -1,14 +1,16 @@
 # Copyright: Multiple Authors
 #
-# This file is part of SigMF. https://github.com/sigmf/sigmf-python
+# This file is part of sigmf-python. https://github.com/sigmf/sigmf-python
 #
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 """Utilities"""
 
+import re
+import sys
 from copy import deepcopy
 from datetime import datetime
-import sys
+
 import numpy as np
 
 from . import error
@@ -30,6 +32,13 @@ def parse_iso8601_datetime(datestr: str) -> datetime:
     >>> parse_iso8601_datetime("1955-11-05T06:15:00Z")
     datetime.datetime(1955, 11, 5, 6, 15)
     """
+    # provided string exceeds max precision -> truncate to µs
+    match = re.match(r"^(?P<dt>.*)(?P<frac>\.[0-9]{7,})Z$", datestr)
+    if match:
+        md = match.groupdict()
+        length = min(7, len(md["frac"]))
+        datestr = ''.join([md["dt"], md["frac"][:length], "Z"])
+
     try:
         timestamp = datetime.strptime(datestr, '%Y-%m-%dT%H:%M:%S.%fZ')
     except ValueError:

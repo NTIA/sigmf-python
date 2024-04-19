@@ -1,23 +1,26 @@
 # Copyright: Multiple Authors
 #
-# This file is part of SigMF. https://github.com/sigmf/sigmf-python
+# This file is part of sigmf-python. https://github.com/sigmf/sigmf-python
 #
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
 '''SigMFFile Object'''
 
-from collections import OrderedDict
 import codecs
 import json
 from os import path
 import warnings
+from collections import OrderedDict
+from os import path
+
 import numpy as np
 
-from . import schema, sigmf_hash, validate
-from .archive import SigMFArchive, SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SIGMF_ARCHIVE_EXT, SIGMF_COLLECTION_EXT
+from . import __specification__, schema, sigmf_hash, validate
+from .archive import SIGMF_ARCHIVE_EXT, SIGMF_COLLECTION_EXT, SIGMF_DATASET_EXT, SIGMF_METADATA_EXT, SigMFArchive
+from .error import SigMFAccessError, SigMFFileError
 from .sigmffile_collection import AbstractSigMFFileCollection, SigMFFileCollection
 from .utils import dict_merge
-from .error import SigMFFileError, SigMFAccessError
+
 
 class SigMFMetafile():
     VALID_KEYS = {}
@@ -197,6 +200,7 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
         if metadata is None:
             self._metadata = {self.GLOBAL_KEY:{}, self.CAPTURE_KEY:[], self.ANNOTATION_KEY:[]}
             self._metadata[self.GLOBAL_KEY][self.NUM_CHANNELS_KEY] = 1
+            self._metadata[self.GLOBAL_KEY][self.VERSION_KEY] = __specification__
         elif isinstance(metadata, dict):
             self._metadata = metadata
         else:
@@ -205,9 +209,6 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
             self.set_global_info(global_info)
         if data_file is not None:
             self.set_data_file(data_file, skip_checksum=skip_checksum, map_readonly=map_readonly)
-        self.name = name
-
-        self._metadata[self.GLOBAL_KEY][self.VERSION_KEY] = '1.0.0'
 
     def __len__(self):
         return self._memmap.shape[0]
@@ -226,7 +227,7 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
 
     def __getitem__(self, sli):
         mem = self._memmap[sli] # matches behavior of numpy.ndarray.__getitem__()
-        
+
         if self._return_type is None:
             return mem
 
@@ -267,13 +268,15 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
 
     def _is_conforming_dataset(self):
         """
-        Returns `True` if the dataset is conforming to SigMF, `False` otherwise
-
         The dataset is non-conforming if the datafile contains non-sample bytes
         which means global trailing_bytes field is zero or not set, all captures
         `header_bytes` fields are zero or not set. Because we do not necessarily
         know the filename no means of verifying the meta/data filename roots
         match, but this will also check that a data file exists.
+
+        Returns
+        -------
+        `True` if the dataset is conforming to SigMF, `False` otherwise
         """
         if self.get_global_field(self.TRAILING_BYTES_KEY, 0):
             return False
@@ -443,7 +446,7 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
         annotations = self._metadata.get(self.ANNOTATION_KEY, [])
         if index is None:
             return annotations
-        
+
         annotations_including_index = []
         for annotation in annotations:
             if index < annotation[self.START_INDEX_KEY]:
@@ -454,7 +457,7 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
                 if index >= annotation[self.START_INDEX_KEY] + annotation[self.LENGTH_INDEX_KEY]:
                     # index is after annotation end -> skip
                     continue
-            
+
             annotations_including_index.append(annotation)
         return annotations_including_index
 
@@ -785,8 +788,6 @@ class SigMFCollection(SigMFMetafile):
 
         if not self.skip_checksums:
             self.verify_stream_hashes()
-
-        self._metadata[self.COLLECTION_KEY][self.VERSION_KEY] = '1.0.0'
 
     def __len__(self):
         '''
