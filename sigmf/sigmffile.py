@@ -195,6 +195,7 @@ class SigMFFile(SigMFMetafile, AbstractSigMFFileCollection):
         self.data_file = None
         self.sample_count = 0
         self._memmap = None
+        self.name = name
         self.is_complex_data = False  # numpy.iscomplexobj(self._memmap) is not adequate for fixed-point complex case
 
         if metadata is None:

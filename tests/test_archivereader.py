@@ -6,12 +6,16 @@
 
 """Tests for SigMFArchiveReader"""
 
+import os
+import shutil
 import tempfile
 import unittest
 
 import numpy as np
 
 from sigmf import SigMFArchiveReader, SigMFFile, __specification__
+from sigmf.archive import SIGMF_METADATA_EXT, SigMFArchive
+from sigmf.sigmffile_collection import SigMFFileCollection
 
 
 class TestArchiveReader(unittest.TestCase):

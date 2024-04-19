@@ -72,7 +72,7 @@ def test_alternate_sigmffile(test_data_file_2):
 @pytest.fixture
 def test_alternate_sigmffile_2(test_data_file_3):
     """If pytest uses this signature, will return valid SigMF file."""
-    meta = SigMFFile()
+    meta = SigMFFile("test")
     meta.set_global_field("core:datatype", "rf32_le")
     meta.set_global_field("core:version", __specification__)
     meta.add_annotation(start_index=0, length=len(TEST_FLOAT32_DATA_3))
