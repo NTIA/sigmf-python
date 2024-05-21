@@ -112,7 +112,6 @@ def test_tarfile_names_and_extensions(test_sigmffile):
         assert basedir.name == test_sigmffile.name
         archive_name = sigmf_tarfile.name
         assert archive_name == temp.name
-        path.split(temp.name)[-1]
         file_extensions = {SIGMF_DATASET_EXT, SIGMF_METADATA_EXT}
 
         file1_name, file1_ext = path.splitext(file1.name)
@@ -127,6 +126,8 @@ def test_tarfile_names_and_extensions(test_sigmffile):
 
 
 def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
+    """Verify SigMFFile with path like name has corresponding subfolders
+    when converted to an archive"""
     with tempfile.NamedTemporaryFile() as temp:
         test_sigmffile.name = os.path.join("test_folder", "test")
         sigmf_tarfile = create_test_archive(test_sigmffile, temp)
@@ -135,7 +136,6 @@ def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
         assert subdir.name == test_sigmffile.name
         archive_name = sigmf_tarfile.name
         assert archive_name == temp.name
-        path.split(temp.name)[-1]
         file_extensions = {SIGMF_DATASET_EXT, SIGMF_METADATA_EXT}
 
         file1_name, file1_ext = path.splitext(file1.name)
@@ -153,6 +153,8 @@ def test_tarfile_names_and_extensions_with_paths(test_sigmffile):
 
 def test_multirec_archive_into_fileobj(test_sigmffile,
                                        test_alternate_sigmffile):
+    """Test creating archive with multiple SigMFFiles by appending
+    to file object"""
     with tempfile.NamedTemporaryFile() as t:
         # add first sigmffile to the fileobj t
         create_test_archive(test_sigmffile, t)
@@ -200,7 +202,8 @@ def test_tarfile_type(test_sigmffile):
         assert sigmf_tarfile.format == tarfile.PAX_FORMAT
 
 
-def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
+def test_create_archive_path(test_sigmffile, test_alternate_sigmffile):
+    """Test creating an archive using a Path object"""
     with tempfile.NamedTemporaryFile() as t:
         input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(input_sigmffiles, path=Path(t.name))
@@ -210,22 +213,24 @@ def test_create_archive_pathlike(test_sigmffile, test_alternate_sigmffile):
 
 
 def test_archive_names(test_sigmffile):
+    """Test SigMF name when read from archive where
+    archive was created 3 different ways"""
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         a = SigMFArchive(sigmffile_collection=test_sigmffile, path=t.name)
         assert a.path == t.name
         observed_sigmffile = sigmffile.fromarchive(t.name)
-        observed_sigmffile.name == test_sigmffile.name
+        assert observed_sigmffile.name == test_sigmffile.name
 
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         archive_path = test_sigmffile.archive(t.name)
         assert archive_path == t.name
         observed_sigmffile = sigmffile.fromarchive(t.name)
-        observed_sigmffile.name == test_sigmffile.name
+        assert observed_sigmffile.name == test_sigmffile.name
 
     with tempfile.NamedTemporaryFile(suffix=".sigmf") as t:
         test_sigmffile.tofile(t.name, toarchive=True)
         observed_sigmffile = sigmffile.fromarchive(t.name)
-        observed_sigmffile.name == test_sigmffile.name
+        assert observed_sigmffile.name == test_sigmffile.name
 
 
 def test_archive_no_path_or_fileobj(test_sigmffile):
@@ -245,19 +250,19 @@ def test_fromfile_name_to_archive(test_sigmffile):
         assert read_sigmffile.name == '/tmp/test_sigmf'
         read_sigmffile.set_data_file(data_file=test_sigmffile.data_file)
         read_sigmffile.archive('/tmp/testarchive.sigmf')
-        sigmf_tar = tarfile.open('/tmp/testarchive.sigmf')
-        basedir, subdir, file1, file2 = sigmf_tar.getmembers()
-        assert basedir.name == 'tmp'
-        assert subdir.name == 'tmp/test_sigmf'
-        if file1.name.endswith(SIGMF_DATASET_EXT):
-            sigmf_data = file1
-            sigmf_meta = file2
-        else:
-            sigmf_data = file2
-            sigmf_meta = file1
+        with tarfile.open('/tmp/testarchive.sigmf') as sigmf_tar:
+            basedir, subdir, file1, file2 = sigmf_tar.getmembers()
+            assert basedir.name == 'tmp'
+            assert subdir.name == 'tmp/test_sigmf'
+            if file1.name.endswith(SIGMF_DATASET_EXT):
+                sigmf_data = file1
+                sigmf_meta = file2
+            else:
+                sigmf_data = file2
+                sigmf_meta = file1
 
-        assert sigmf_data.name == 'tmp/test_sigmf/test_sigmf.sigmf-data'
-        assert sigmf_meta.name == 'tmp/test_sigmf/test_sigmf.sigmf-meta'
+            assert sigmf_data.name == 'tmp/test_sigmf/test_sigmf.sigmf-data'
+            assert sigmf_meta.name == 'tmp/test_sigmf/test_sigmf.sigmf-meta'
     finally:
         if os.path.exists('/tmp/test_sigmf.sigmf-meta'):
             os.remove('/tmp/test_sigmf.sigmf-meta')

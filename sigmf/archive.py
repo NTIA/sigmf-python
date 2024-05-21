@@ -74,60 +74,62 @@ class SigMFArchive():
         mode = "a" if fileobj is not None else "w"
         sigmf_fileobj = self._get_output_fileobj()
         try:
-            sigmf_archive = tarfile.TarFile(mode=mode,
-                                            fileobj=sigmf_fileobj,
-                                            format=tarfile.PAX_FORMAT)
-        except tarfile.ReadError:
-            # fileobj doesn't contain any archives yet, so reopen in 'w' mode
-            sigmf_archive = tarfile.TarFile(mode='w',
-                                            fileobj=sigmf_fileobj,
-                                            format=tarfile.PAX_FORMAT)
+            try:
+                sigmf_archive = tarfile.TarFile(mode=mode,
+                                                fileobj=sigmf_fileobj,
+                                                format=tarfile.PAX_FORMAT)
+            except tarfile.ReadError:
+                # fileobj doesn't contain any archives yet, so reopen in 'w' mode
+                sigmf_archive = tarfile.TarFile(mode='w',
+                                                fileobj=sigmf_fileobj,
+                                                format=tarfile.PAX_FORMAT)
 
-        def chmod(tarinfo):
-            if tarinfo.isdir():
-                tarinfo.mode = 0o755  # dwrxw-rw-r
-            else:
-                tarinfo.mode = 0o644  # -wr-r--r--
-            return tarinfo
+            def chmod(tarinfo):
+                if tarinfo.isdir():
+                    tarinfo.mode = 0o755  # dwrxw-rw-r
+                else:
+                    tarinfo.mode = 0o644  # -wr-r--r--
+                return tarinfo
 
-        for sigmffile in self.sigmffiles:
-            sigmffile_name = os.path.normpath(sigmffile.name)
-            if os.path.isabs(sigmffile_name):
-                # remove root path component to make relative path for tarfile
-                sigmffile_name_split = sigmffile_name.split(os.path.sep)
-                sigmffile_name = os.path.sep.join(sigmffile_name_split[1:])
+            for sigmffile in self.sigmffiles:
+                sigmffile_name = os.path.normpath(sigmffile.name)
                 if os.path.isabs(sigmffile_name):
-                    raise SigMFFileError("Invalid SigMFFile name")
-            self._create_parent_dirs(sigmf_archive, sigmffile_name, chmod)
-            file_path = os.path.join(sigmffile_name,
-                                     os.path.basename(sigmffile_name))
-            sf_md_filename = file_path + SIGMF_METADATA_EXT
-            sf_data_filename = file_path + SIGMF_DATASET_EXT
-            metadata = sigmffile.dumps(pretty=pretty)
-            metadata_tarinfo = tarfile.TarInfo(sf_md_filename)
-            metadata_tarinfo.size = len(metadata)
-            metadata_tarinfo.mtime = time.time()
-            metadata_tarinfo = chmod(metadata_tarinfo)
-            metadata_buffer = BytesIO(metadata.encode("utf-8"))
-            sigmf_archive.addfile(metadata_tarinfo, fileobj=metadata_buffer)
-            data_tarinfo = sigmf_archive.gettarinfo(name=sigmffile.data_file,
-                                                    arcname=sf_data_filename)
-            if sigmffile.offset_and_size:
-                data_tarinfo.size = sigmffile.offset_and_size[1]
-
-            data_tarinfo = chmod(data_tarinfo)
-            with open(sigmffile.data_file, "rb") as data_file:
+                    # remove root path component to make relative path for tarfile
+                    sigmffile_name_split = sigmffile_name.split(os.path.sep)
+                    sigmffile_name = os.path.sep.join(sigmffile_name_split[1:])
+                    if os.path.isabs(sigmffile_name):
+                        raise SigMFFileError("Invalid SigMFFile name")
+                self._create_parent_dirs(sigmf_archive, sigmffile_name, chmod)
+                file_path = os.path.join(sigmffile_name,
+                                        os.path.basename(sigmffile_name))
+                sf_md_filename = file_path + SIGMF_METADATA_EXT
+                sf_data_filename = file_path + SIGMF_DATASET_EXT
+                metadata = sigmffile.dumps(pretty=pretty)
+                metadata_tarinfo = tarfile.TarInfo(sf_md_filename)
+                metadata_tarinfo.size = len(metadata)
+                metadata_tarinfo.mtime = time.time()
+                metadata_tarinfo = chmod(metadata_tarinfo)
+                metadata_buffer = BytesIO(metadata.encode("utf-8"))
+                sigmf_archive.addfile(metadata_tarinfo, fileobj=metadata_buffer)
+                data_tarinfo = sigmf_archive.gettarinfo(name=sigmffile.data_file,
+                                                        arcname=sf_data_filename)
                 if sigmffile.offset_and_size:
-                    data_file.seek(sigmffile.offset_and_size[0])
-                sigmf_archive.addfile(data_tarinfo, fileobj=data_file)
+                    data_tarinfo.size = sigmffile.offset_and_size[1]
 
-        sigmf_archive.close()
-        if not fileobj:
-            sigmf_fileobj.close()
-        else:
-            sigmf_fileobj.seek(0)  # ensure next open can read this as a tar
+                data_tarinfo = chmod(data_tarinfo)
+                with open(sigmffile.data_file, "rb") as data_file:
+                    if sigmffile.offset_and_size:
+                        data_file.seek(sigmffile.offset_and_size[0])
+                    sigmf_archive.addfile(data_tarinfo, fileobj=data_file)
+            
+            self.path = sigmf_archive.name
+        finally:
+            sigmf_archive.close()
+            if (not fileobj) and sigmf_fileobj:
+                sigmf_fileobj.close()
+            else:
+                sigmf_fileobj.seek(0)  # ensure next open can read this as a tar
 
-        self.path = sigmf_archive.name
 
     def _create_parent_dirs(self, _tarfile, sigmffile_name, set_permission):
         """ Create parent directory TarInfo objects if tarfile doesn't

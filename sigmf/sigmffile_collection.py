@@ -7,6 +7,8 @@ from .archive import SigMFArchive
 
 
 class AbstractSigMFFileCollection(ABC):
+    """Abstract collection of SigMF files that can be
+    represented by a single SigMF or multiple SigMF files"""
 
     @abstractmethod
     def sigmffile_count(self):
@@ -24,6 +26,8 @@ class AbstractSigMFFileCollection(ABC):
 
 
 class SigMFFileCollection(AbstractSigMFFileCollection):
+    """Implementation of AbstractSigMFFileCollection representing
+    collection of multiple SigMF files"""
 
     def __init__(self, sigmffiles: Iterable["sigmf.sigmffile.SigMFFile"]) -> None:
         self.sigmffiles = sigmffiles

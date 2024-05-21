@@ -90,6 +90,7 @@ class TestArchiveReader(unittest.TestCase):
 
 
 def test_extract_single_recording(test_sigmffile):
+    """Test reading an archive with 1 recording"""
     with tempfile.NamedTemporaryFile() as tf:
         expected_sigmffile = test_sigmffile
         arch = SigMFArchive(expected_sigmffile, path=tf.name)
@@ -100,6 +101,7 @@ def test_extract_single_recording(test_sigmffile):
 
 
 def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
+    """Test reading an archive with 2 recordings"""
     with tempfile.NamedTemporaryFile() as tf:
         # Create a multi-recording archive
         expected_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
@@ -110,19 +112,14 @@ def test_extract_multi_recording(test_sigmffile, test_alternate_sigmffile):
             assert expected in reader.sigmffiles
 
 
-def test_archivereader_different_folder(test_sigmffile,
+def test_archivereader_subfolders_1(test_sigmffile,
                                         test_alternate_sigmffile):
+    """Test reading a SigMF archive containing 2 subfolders each containing a subfolder"""
     try:
         os.makedirs("folder1", exist_ok=True)
         test_sigmffile.name = os.path.join("folder1", "test1")
         os.makedirs("folder2", exist_ok=True)
         test_alternate_sigmffile.name = os.path.join("folder2", "test2")
-        meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
-        with open(meta1_filepath, "w") as meta_fd:
-            test_sigmffile.dump(meta_fd)
-        meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
-        with open(meta2_filepath, "w") as meta_fd:
-            test_alternate_sigmffile.dump(meta_fd)
 
         os.makedirs("archive_folder", exist_ok=True)
         archive_path = os.path.join("archive_folder", "test_archive.sigmf")
@@ -133,10 +130,6 @@ def test_archivereader_different_folder(test_sigmffile,
         for actual_sigmffile in reader:
             assert actual_sigmffile in input_sigmffiles.get_sigmffiles()
     finally:
-        if os.path.exists(meta1_filepath):
-            os.remove(meta1_filepath)
-        if os.path.exists(meta2_filepath):
-            os.remove(meta2_filepath)
         if os.path.exists(archive_path):
             os.remove(archive_path)
         if os.path.exists("folder1"):
@@ -147,19 +140,16 @@ def test_archivereader_different_folder(test_sigmffile,
             shutil.rmtree("archive_folder")
 
 
-def test_archivereader_same_folder(test_sigmffile,
+def test_archivereader_subfolders_2(test_sigmffile,
                                    test_alternate_sigmffile):
+    """Test reading a SigMF archive containing 1 subfolder containing 2 additional subfolders"""
     try:
         os.makedirs("folder1", exist_ok=True)
         test_sigmffile.name = os.path.join("folder1", "test1")
         test_alternate_sigmffile.name = os.path.join("folder1", "test2")
-        meta1_filepath = test_sigmffile.name + SIGMF_METADATA_EXT
-        with open(meta1_filepath, "w") as meta_fd:
-            test_sigmffile.dump(meta_fd)
-        meta2_filepath = test_alternate_sigmffile.name + SIGMF_METADATA_EXT
-        with open(meta2_filepath, "w") as meta_fd:
-            test_alternate_sigmffile.dump(meta_fd)
-        archive_path = os.path.join("folder1", "test_archive.sigmf")
+
+        os.makedirs("archive_folder", exist_ok=True)
+        archive_path = os.path.join("archive_folder", "test_archive.sigmf")
         input_sigmffiles = SigMFFileCollection([test_sigmffile, test_alternate_sigmffile])
         arch = SigMFArchive(input_sigmffiles, path=archive_path)
         reader = SigMFArchiveReader(arch.path)
@@ -167,10 +157,6 @@ def test_archivereader_same_folder(test_sigmffile,
         for actual_sigmffile in reader:
             assert actual_sigmffile in input_sigmffiles.get_sigmffiles()
     finally:
-        if os.path.exists(meta1_filepath):
-            os.remove(meta1_filepath)
-        if os.path.exists(meta2_filepath):
-            os.remove(meta2_filepath)
         if os.path.exists(archive_path):
             os.remove(archive_path)
         if os.path.exists("folder1"):

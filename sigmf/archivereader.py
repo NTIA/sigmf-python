@@ -122,7 +122,7 @@ class SigMFArchiveReader():
 
                     self.sigmffiles.append(sigmffile)
 
-            if not any([r.data for r in recordings]):
+            if not any(r.data for r in recordings):
                 warnings.warn(f"No file with {SIGMF_DATASET_EXT} extension"
                               " found in archive!")
         finally:

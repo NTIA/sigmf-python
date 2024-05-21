@@ -11,7 +11,6 @@ import json
 from os import path
 import warnings
 from collections import OrderedDict
-from os import path
 
 import numpy as np
 
